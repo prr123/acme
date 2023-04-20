@@ -18,9 +18,12 @@ import (
 	"fmt"
 	"os"
 	"time"
+	"net"
 
+    cfLib "acme/acmeDns/cfLib"
     yaml "github.com/goccy/go-yaml"
 	"golang.org/x/crypto/acme"
+	"github.com/cloudflare/cloudflare-go"
 )
 
 type DomainObj struct {
@@ -88,28 +91,54 @@ type JsAcnt struct {
 
 
 func main() {
+
+	numarg := len(os.Args)
+
+	useStr := "acmeDnsTest [domainfile]"
+    yamlFilNam := "acmeDomains.yaml"
+
+	if numarg > 2 {
+		fmt.Println(useStr)
+		fmt.Println("too many arguments in cl!")
+		os.Exit(-1)
+	}
+
+	if numarg == 2 {
+		if os.Args[1] == "help" {
+			fmt.Println(useStr)
+			os.Exit(1)
+		}
+		yamlFilNam = os.Args[1]
+	}
+
+	log.Printf("Using domain file: %s\n", yamlFilNam)
+
 	ctx := context.Background()
 
 // mod 1: replace
 //	client := acmeClient(ctx)
 
-	client := newClient(ctx)
+	dbg := true
+	client := newClient(ctx, dbg)
 
 //	fmt.Printf("client: %v\n", client)
+	log.Printf("success creating acme client!\n")
 	PrintClient(client)
 //	os.Exit(1)
 
 // mod 2: read domains
-    yamlFilNam := "domains.yaml"
+
 
     domains, err := rdDomain(yamlFilNam)
     if err != nil {log.Fatalf("rdDomain: %v\n", err)}
 
+	log.Printf("success reading domains!\n")
 	PrintDomains(domains)
 
 	dir, err := client.Discover(ctx)
 	if err != nil {log.Fatalf("Discover error: %v\n", err)}
 
+	log.Printf("success getting dir\n")
 	PrintDir(dir)
 
 	authIdList := make([]acme.AuthzID, len(domains))
@@ -123,67 +152,93 @@ func main() {
 		authIdList[i].Value = domain
 
 	}
-// lets encrypt does not accept preauthorisation
-/*
-		authz, err := client.Authorize(ctx, domain)
-		if err != nil {log.Fatalf("client.Authorize: %v\n",err)}
 
-		PrintAuth(authz)
-
-		if authz.Status == acme.StatusValid {
-			// Already authorized.
-			continue
-		}
-*/
-
-//	var orderOpt acme.OrderOption
+	// lets encrypt does not accept preauthorisation
+	// var orderOpt acme.OrderOption
+	// OrderOption is contains optional parameters regarding timing
 
 	order, err := client.AuthorizeOrder(ctx, authIdList)
 	if err != nil {log.Fatalf("client.AuthorizeOrder: %v\n",err)}
 
+	log.Printf("success getting acme orders!\n")
 	PrintOrder(*order)
 
+	// need to loop through domains
+	domain := authIdList[0].Value
+	url := order.AuthzURLs[0]
 
+	auth, err := client.GetAuthorization(ctx, url)
+	if err != nil {log.Fatalf("client.GetAuthorisation: %v\n",err)}
 
+	log.Printf("success getting authorization for domain: %s\n", domain)
+	PrintAuth(auth)
+
+	// Pick the DNS challenge, if any.
+	var chal *acme.Challenge
+	for _, c := range auth.Challenges {
+		if c.Type == "dns-01" {
+			chal = c
+			break
+		}
+	}
+
+	if chal == nil {log.Fatalf("no dns-01 challenge for %s", domain)}
+
+	log.Printf("success obtaining challenge\n")
+	PrintChallenge(chal, domain)
+
+	// Fulfill the challenge.
+	val, err := client.DNS01ChallengeRecord(chal.Token)
+	if err != nil {log.Fatalf("dns-01 token for %q: %v", domain, err)}
+
+	log.Printf("success obtaining Dns Rec Value: %s\n", val)
+
+	err = AddDnsChalRecord(val)
+	if err != nil {log.Fatalf("CreateDnsRecord: %v", err)}
+
+	log.Printf("success creating dns record!")
+
+	// check DNS Record via LookUp
+	acmeDomain := "_acme-challenge." + domain
+
+	suc := false
+	for i:= 0; i< 5; i++ {
+		_, err := net.LookupTXT(acmeDomain)
+		if err == nil {suc = true; break}
+		time.Sleep(10 * time.Second)
+	}
+	if !suc {log.Fatalf("could not find acme record: %v", err)}
+
+	// Let CA know we're ready. But are we? Is DNS propagated yet?
+	if _, err := client.Accept(ctx, chal); err != nil {
+		log.Fatalf("dns-01 accept for %q: %v", domain, err)
+	}
+
+	url = order.URI
+    log.Printf("**** waiting for order for domain: %s ****\n", url)
+    ord2, err := client.WaitOrder(ctx, url)
+    if err != nil {log.Fatalf("client.WaitOrder: %v\n",err)}
+
+    PrintOrder(*ord2)
 
 /*
-		// Pick the DNS challenge, if any.
-		var chal *acme.Challenge
-		for _, c := range authz.Challenges {
-			if c.Type == "dns-01" {
-				chal = c
-				break
-			}
-		}
-		if chal == nil {
-			log.Fatalf("no dns-01 challenge for %q", domain)
-		}
+	log.Printf("**** waiting for order for domain: %s ****\n", url)
+	ord2, err := client.WaitOrder(ctx, url)
+	if err != nil {log.Fatalf("client.AuthorizeOrder: %v\n",err)}
 
-		// Fulfill the challenge.
-		val, err := client.DNS01ChallengeRecord(chal.Token)
-		if err != nil {
-			log.Fatalf("dns-01 token for %q: %v", domain, err)
-		}
-
-		fmt.Printf("val: %s\n", val)
-
-		// TODO: Implement. This depends on your DNS hosting.
-		// The function must provision a TXT record containing
-		// the val value under "_acme-challenge" name.
-
-//		if err := updateMyDNS(ctx, domain, val); err != nil {
-//			log.Fatalf("DNS update for %q: %v", domain, err)
-//		}
+	PrintOrder(*ord2)
 
 
-		// Let CA know we're ready. But are we? Is DNS propagated yet?
-		if _, err := client.Accept(ctx, chal); err != nil {
-			log.Fatalf("dns-01 accept for %q: %v", domain, err)
-		}
-		// Wait for the CA to validate.
-		if _, err := client.WaitAuthorization(ctx, authz.URL); err != nil {
-			log.Fatalf("authorization for %q failed: %v", domain, err)
-		}
+	fmt.Printf("**** waiting for authorisation at url: %s ****\n", url)
+	auth, err := client.WaitAuthorization(ctx, url)
+	if err != nil {log.Fatalf("client.AuthorizeOrder: %v\n",err)}
+
+	PrintAuth(auth)
+//	for i:=0; i<len(domains); i++ {
+
+//	}
+
+
 */
 
 /*
@@ -214,7 +269,7 @@ func main() {
 	log.Printf("success\n")
 }
 
-func newClient(ctx context.Context) *acme.Client {
+func newClient(ctx context.Context, dbg bool) *acme.Client {
 
 	akey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
@@ -226,22 +281,93 @@ func newClient(ctx context.Context) *acme.Client {
 	client := &acme.Client{Key: akey}
 	client.DirectoryURL = "https://acme-staging-v02.api.letsencrypt.org/directory"
 
-	PrintClient(client)
+	log.Printf("success client created\n")
+	if dbg {
+		PrintClient(client)
+	}
 
 	acnt, err := client.Register(ctx, &acme.Account{}, acme.AcceptTOS)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	PrintAccount(acnt)
-
+	log.Printf("success CA account generated\n")
+	if dbg {
+		PrintAccount(acnt)
+	}
 
 //	jsAct := JsAcnt(*acnt)
 
 //	PrintJsAccount(&jsAct)
 
-	log.Printf("newClient: registered successfully!\n")
+//	log.Printf("newClient: registered successfully!\n")
 	return client
+}
+
+// function that reads the file with name filNam and returns an array of domain names
+func rdDomain(filNam string) (doms []string, err error) {
+
+    var dom DomainObj
+
+    data, err := os.ReadFile(filNam)
+    if err != nil {return nil, fmt.Errorf("os.ReadFile: %v", err)}
+
+    err = yaml.Unmarshal(data, &dom)
+    if err != nil { return nil, fmt.Errorf("yaml.Unmarshal: %v", err)}
+
+    return dom.Domains, nil
+}
+
+
+// function that creates DNS Challenge record
+func AddDnsChalRecord (val string) (err error) {
+
+   yamlFilNam := "cloudflareApi.yaml"
+
+    apiObj, err := cfLib.InitCfLib(yamlFilNam)
+    if err != nil {
+        log.Fatalf("cfLib.InitCfLib: %v\n", err)
+    }
+    // print results
+    cfLib.PrintApiObj (apiObj)
+
+    api, err := cloudflare.NewWithAPIToken(apiObj.ApiToken)
+    if err != nil {
+        log.Fatalf("api init: %v/n", err)
+    }
+
+    // Most API calls require a Context
+    ctx := context.Background()
+
+    fmt.Println("************** before *********************")
+
+//  cfLib.PrintDnsRec(&dnsRecs)
+
+    // try to create DNS Record
+    dnsPar := cloudflare.CreateDNSRecordParams{
+        CreatedOn: time.Now(),
+        Type: "TXT",
+        Name: "_acme-challenge",
+        Content: val,
+        TTL: 30000,
+        Comment: "acme challenge record",
+    }
+
+    var rc cloudflare.ResourceContainer
+    //domains
+    rc.Level = cloudflare.ZoneRouteLevel
+    //domain id == zone id
+    rc.Identifier = "d122e58449ac644ef5d11c983e3ca7eb"
+
+    dnsRec, err := api.CreateDNSRecord(ctx, &rc, dnsPar)
+    if err != nil {
+        log.Fatalf("api.CreateDNSRecord: %v\n", err)
+    }
+
+    log.Printf("success creating Dns Record!\n")
+	cfLib.PrintDnsRec(&dnsRec)
+
+	return nil
 }
 
 func PrintAccount (acnt *acme.Account) {
@@ -257,6 +383,7 @@ func PrintAccount (acnt *acme.Account) {
 	fmt.Println (" *** non RFC 8588 compliant terms  ***")
 	fmt.Printf("AgreedTerms: %s\n", acnt.AgreedTerms)
 	fmt.Printf("Authz: %s\n", acnt.Authz)
+	fmt.Println("***************** End Account ******************")
 }
 
 func PrintJsAccount (acnt *JsAcnt) {
@@ -273,25 +400,28 @@ func PrintJsAccount (acnt *JsAcnt) {
 
 func PrintClient (client *acme.Client) {
 
-	fmt.Println("***************** Acme Client ******************")
+	fmt.Println("************** Acme Client ******************")
 	fmt.Printf("Key: %v\n", client.Key)
 	fmt.Printf("HTTPClient: %v\n",client.HTTPClient)
 	fmt.Printf("Directory: %s\n", client.DirectoryURL)
 	fmt.Printf("Retry: %v\n", client.RetryBackoff)
 	fmt.Printf("UserAgent: %s\n",client.UserAgent)
 	fmt.Printf("KID: %s\n", client.KID)
+	fmt.Println("***************** End Client ******************")
 }
 
 func PrintAuth(auth *acme.Authorization) {
 	fmt.Println("*********** authorization ***********")
 	fmt.Printf("URI:    %s\n", auth.URI)
 	fmt.Printf("Status: %s\n", auth.Status)
-	fmt.Printf("Id:     %s\n", auth.Identifier)
+	fmt.Printf("Id typ: %s val: %s\n", auth.Identifier.Type, auth.Identifier.Value)
 	ExpTimStr:= auth.Expires.Format(time.RFC1123)
 	fmt.Printf("Expires %s\n", ExpTimStr)
+	fmt.Printf("*** Challenges[%d] ***\n", len(auth.Challenges))
 	for i, chal := range auth.Challenges {
-		fmt.Printf("chal[%d]: %s URI: %s Token: %s Status: %s err: %v\n", i+1, chal.Type, chal.URI, chal.Token, chal.Status, chal.Error)
+		fmt.Printf("   [%d]: %s URI: %s Token: %s Status: %s err: %v\n", i+1, chal.Type, chal.URI, chal.Token, chal.Status, chal.Error)
 	}
+	fmt.Println("*********** end authorization ***********")
 }
 
 func PrintDomains(domains []string) {
@@ -299,11 +429,12 @@ func PrintDomains(domains []string) {
     for i, domain := range domains {
         fmt.Printf("domain[%d]: %s\n", i+1, domain)
     }
+	fmt.Printf("***** end domains *******\n")
 }
 
 func PrintDir(dir acme.Directory) {
 
-	fmt.Println("**** Directory *****")
+	fmt.Println("********** Directory **********")
 	fmt.Printf("AuthzUrl: %s\n", dir.AuthzURL)
 	fmt.Printf("OrderUrl: %s\n", dir.OrderURL)
 	fmt.Printf("RevokeUrl: %s\n", dir.RevokeURL)
@@ -313,11 +444,11 @@ func PrintDir(dir acme.Directory) {
 	fmt.Printf("Meta Website: %s\n", dir.Website)
 	fmt.Printf("Meta CAA: %s\n", dir.CAA)
 	fmt.Printf("External Account Req: %v\n", dir.ExternalAccountRequired)
-
+	fmt.Println("******* End Directory *********")
 }
 
 func PrintOrder(ord acme.Order) {
-	fmt.Println("******* Order ***********")
+	fmt.Println("************ Order **************")
 	fmt.Printf("URI: %s\n", ord.URI)
 	fmt.Printf("Status: %s\n", ord.Status)
 	fmt.Printf("Expires: %s\n", ord.Expires.Format(time.RFC1123))
@@ -334,19 +465,18 @@ func PrintOrder(ord acme.Order) {
 	fmt.Printf("FinalizeURL: %s\n", ord.FinalizeURL)
 	fmt.Printf("CertURL: %s\n", ord.CertURL)
 	fmt.Printf("error: %v\n", ord.Error)
+	fmt.Println("********* End Order **************")
 
 }
 
-// function that reads the file with name filNam and returns an array of domain names
-func rdDomain(filNam string) (doms []string, err error) {
-
-    var dom DomainObj
-
-    data, err := os.ReadFile(filNam)
-    if err != nil {return nil, fmt.Errorf("os.ReadFile: %v", err)}
-
-    err = yaml.Unmarshal(data, &dom)
-    if err != nil { return nil, fmt.Errorf("yaml.Unmarshal: %v", err)}
-
-    return dom.Domains, nil
+func PrintChallenge(chal *acme.Challenge, domain string) {
+	fmt.Printf("*************** %s Challenge ********\n", domain)
+	fmt.Printf("Type: %s\n", chal.Type)
+	fmt.Printf("URI:  %s\n", chal.URI)
+	fmt.Printf("Token: %s\n", chal.Token)
+	fmt.Printf("Status: %s\n", chal.Status)
+	fmt.Printf("Validated: %s\n", chal.Validated.Format(time.RFC1123))
+	fmt.Printf("Error: %v\n", chal.Error)
+	fmt.Printf("*************** End Challenge ********\n")
 }
+
