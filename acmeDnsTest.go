@@ -95,7 +95,8 @@ func main() {
 	numarg := len(os.Args)
 
 	useStr := "acmeDnsTest [domainfile]"
-    yamlFilNam := "acmeDomains.yaml"
+    zoneFilNam := "/home/peter/zones/cfDomainsShort.yaml"
+	acmeDomainFilNam := "acmeDomains.yaml"
 
 	if numarg > 2 {
 		fmt.Println(useStr)
@@ -108,10 +109,48 @@ func main() {
 			fmt.Println(useStr)
 			os.Exit(1)
 		}
-		yamlFilNam = os.Args[1]
+		acmeDomainFilNam = os.Args[1]
 	}
 
-	log.Printf("Using domain file: %s\n", yamlFilNam)
+	log.Printf("Using zone file: %s\n", zoneFilNam)
+	log.Printf("Using acme Domain file: %s\n", acmeDomainFilNam)
+
+    zoneList, err := cfLib.ReadZoneShortFile(zoneFilNam)
+    if err != nil {log.Fatalf("ReadZoneFileShort: %v\n", err)}
+
+	log.Printf("success reading domains!\n")
+	cfLib.PrintZoneList(zoneList)
+
+	numZones := len(zoneList.Zones)
+
+	log.Printf("Acme Chal Domain Target: %d\n", numZones)
+	if numZones == 0 {log.Fatalf("no domains in file: %s\n", zoneFilNam)}
+
+	// read list of Domains for Acme Challenge
+
+	domains, err := rdDomain(acmeDomainFilNam)
+    if err != nil {log.Fatalf("rdDomains: %v\n", err)}
+
+	if len(domains) == 0 {log.Fatalf("no acme domains found in %s\n", acmeDomainFilNam)}
+	PrintDomains(domains)
+
+	acmeDomList := make([]cfLib.ZoneShort, len(domains))
+	// see whether acme domains are in zoneList
+
+	for j:= 0; j< len(domains); j++ {
+		for i:=0; i< numZones; i++ {
+			if zoneList.Zones[i].Name == domains[j] {
+				acmeDomList[j].Name = domains[j]
+				acmeDomList[j].Id = zoneList.Zones[i].Id
+				break
+			}
+		}
+	}
+
+	for j:= 0; j< len(domains); j++ {
+		fmt.Printf("acme domain: %s id: %s\n", acmeDomList[j].Name, acmeDomList[j].Id)
+	}
+//	os.Exit(1)
 
 	ctx := context.Background()
 
@@ -126,14 +165,6 @@ func main() {
 	PrintClient(client)
 //	os.Exit(1)
 
-// mod 2: read domains
-
-
-    domains, err := rdDomain(yamlFilNam)
-    if err != nil {log.Fatalf("rdDomain: %v\n", err)}
-
-	log.Printf("success reading domains!\n")
-	PrintDomains(domains)
 
 	dir, err := client.Discover(ctx)
 	if err != nil {log.Fatalf("Discover error: %v\n", err)}
@@ -144,15 +175,11 @@ func main() {
 	authIdList := make([]acme.AuthzID, len(domains))
 
 	// Authorize all domains provided in the cmd line args.
-	for i, domain := range domains {
-
-		log.Printf("Domain[%d]: %s\n", i, domain)
-
+//	for i:=0; i< len(domains); i++ {
+	for i:=0; i< 1; i++ {
 		authIdList[i].Type = "dns"
-		authIdList[i].Value = domain
-
+		authIdList[i].Value = acmeDomList[i].Name
 	}
-
 	// lets encrypt does not accept preauthorisation
 	// var orderOpt acme.OrderOption
 	// OrderOption is contains optional parameters regarding timing
@@ -166,6 +193,7 @@ func main() {
 	// need to loop through domains
 	domain := authIdList[0].Value
 	url := order.AuthzURLs[0]
+	acmeZone := acmeDomList[0]
 
 	auth, err := client.GetAuthorization(ctx, url)
 	if err != nil {log.Fatalf("client.GetAuthorisation: %v\n",err)}
@@ -185,15 +213,15 @@ func main() {
 	if chal == nil {log.Fatalf("no dns-01 challenge for %s", domain)}
 
 	log.Printf("success obtaining challenge\n")
-	PrintChallenge(chal, domain)
+	PrintChallenge(chal, acmeZone.Name)
 
 	// Fulfill the challenge.
 	val, err := client.DNS01ChallengeRecord(chal.Token)
-	if err != nil {log.Fatalf("dns-01 token for %q: %v", domain, err)}
+	if err != nil {log.Fatalf("dns-01 token for %q: %v", acmeZone.Name, err)}
 
 	log.Printf("success obtaining Dns Rec Value: %s\n", val)
 
-	err = AddDnsChalRecord(val)
+	err = AddDnsChalRecord(acmeZone, val)
 	if err != nil {log.Fatalf("CreateDnsRecord: %v", err)}
 
 	log.Printf("success creating dns record!")
@@ -201,15 +229,28 @@ func main() {
 	// check DNS Record via LookUp
 	acmeDomain := "_acme-challenge." + domain
 
+	log.Printf("doing ns.Lookup %s for Challenge Record!\n", acmeDomain)
+	log.Printf("wait 10 sec\n")
+	time.Sleep(10 * time.Second)
+	log.Printf("continue: LookUp acme Dns Rec\n")
+
 	suc := false
 	for i:= 0; i< 5; i++ {
-		_, err := net.LookupTXT(acmeDomain)
-		if err == nil {suc = true; break}
-		time.Sleep(10 * time.Second)
+		txtrecs, err := net.LookupTXT(acmeDomain)
+		if err == nil {
+			fmt.Printf("txtrecs [%d]: %s\n", len(txtrecs), txtrecs[0])
+			suc = true;
+			break
+		} else {
+			log.Printf("Lookup err: %v - sleeping %d\n", err, i+1)
+			time.Sleep(10 * time.Second)
+		}
 	}
 	if !suc {log.Fatalf("could not find acme record: %v", err)}
+	log.Printf("Lookup successful!\n")
 
 	// Let CA know we're ready. But are we? Is DNS propagated yet?
+	log.Printf("sending Accept\n")
 	if _, err := client.Accept(ctx, chal); err != nil {
 		log.Fatalf("dns-01 accept for %q: %v", domain, err)
 	}
@@ -320,9 +361,9 @@ func rdDomain(filNam string) (doms []string, err error) {
 
 
 // function that creates DNS Challenge record
-func AddDnsChalRecord (val string) (err error) {
+func AddDnsChalRecord (zone cfLib.ZoneShort, val string) (err error) {
 
-   yamlFilNam := "cloudflareApi.yaml"
+   yamlFilNam := "/home/peter/yaml/cloudflareApi.yaml"
 
     apiObj, err := cfLib.InitCfLib(yamlFilNam)
     if err != nil {
@@ -357,7 +398,8 @@ func AddDnsChalRecord (val string) (err error) {
     //domains
     rc.Level = cloudflare.ZoneRouteLevel
     //domain id == zone id
-    rc.Identifier = "d122e58449ac644ef5d11c983e3ca7eb"
+//    rc.Identifier = "d122e58449ac644ef5d11c983e3ca7eb"
+    rc.Identifier = zone.Id
 
     dnsRec, err := api.CreateDNSRecord(ctx, &rc, dnsPar)
     if err != nil {
