@@ -148,7 +148,7 @@ func main() {
 	}
 
 	for j:= 0; j< len(domains); j++ {
-		fmt.Printf("acme domain: %s id: %s\n", acmeDomList[j].Name, acmeDomList[j].Id)
+		fmt.Printf("acme domain: %20s id: %s\n", acmeDomList[j].Name, acmeDomList[j].Id)
 	}
 //	os.Exit(1)
 
