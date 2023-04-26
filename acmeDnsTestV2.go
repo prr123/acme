@@ -243,8 +243,8 @@ func main() {
 		acmeDomain := "_acme-challenge." + domain
 
 		log.Printf("doing ns.Lookup %s for Challenge Record!\n", acmeDomain)
-		log.Printf("wait 10 sec\n")
-		time.Sleep(10 * time.Second)
+		log.Printf("wait 2 sec\n")
+		time.Sleep(2 * time.Second)
 		log.Printf("continue: LookUp acme Dns Rec\n")
 
 		suc := false
@@ -277,7 +277,7 @@ func main() {
     	PrintOrder(*ord2)
 		err = cfapi.DelDnsChalRecord(acmeZone, recId)
     	if err != nil {log.Fatalf("DelDnsChalRecord: %v\n",err)}
-
+		log.Printf("deleted DNS Chal Record for zone: %s\n", acmeZone.Name)
 	}
 
 /*
