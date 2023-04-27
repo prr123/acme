@@ -1,0 +1,11 @@
+---
+template: csr
+domain:
+email:
+Name:
+  CommonName:
+  Country:
+  Province:
+  Locality:
+  Organisation:
+  OrganisationUnit:
