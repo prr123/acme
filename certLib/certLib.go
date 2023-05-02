@@ -13,12 +13,13 @@ import (
     "time"
 //    "net"
     "context"
+	"strings"
     "crypto/ecdsa"
     "crypto/elliptic"
     "crypto/rand"
     "crypto/x509"
-//    "crypto/x509/pkix"
-//    "encoding/asn1"
+    "crypto/x509/pkix"
+    "encoding/asn1"
     "encoding/pem"
 
    "golang.org/x/crypto/acme"
@@ -144,7 +145,7 @@ func NewClient(ctx context.Context, dbg bool) (cl *acme.Client, err error) {
 }
 
 // registers client with the acme server
-func registerClient(ctx context.Context, client *acme.Client, dbg bool)(ac *acme.Account, err error) {
+func RegisterClient(ctx context.Context, client *acme.Client, dbg bool)(ac *acme.Account, err error) {
 
     acnt, err := client.Register(ctx, &acme.Account{}, acme.AcceptTOS)
     if err != nil { return nil, fmt.Errorf("client.Register: %v", err)}
@@ -155,6 +156,80 @@ func registerClient(ctx context.Context, client *acme.Client, dbg bool)(ac *acme
     }
 
     return acnt, nil
+}
+
+// from https://github.com/eggsampler/acme/blob/master/examples/certbot/certbot.go#L269
+func SaveKeyPem(certKey *ecdsa.PrivateKey, keyFilNam string) (err error) {
+	certKeyEnc, err := x509.MarshalECPrivateKey(certKey)
+	if err != nil {
+		log.Fatalf("Error encoding key: %v", err)
+	}
+
+	b := pem.EncodeToMemory(&pem.Block{
+		Type:  "EC PRIVATE KEY",
+		Bytes: certKeyEnc,
+	})
+
+	if err = os.WriteFile(keyFilNam, b, 0600); err != nil {
+        return fmt.Errorf("Error writing key file %q: %v", keyFilNam, err)
+    }
+
+	return nil
+}
+
+func SaveCertsPem(derCerts [][]byte, certFile string)(err error){
+
+	certs := make([]*x509.Certificate, len(derCerts))
+	var pemData []string
+	for i, asn1Data := range derCerts {
+		certs[i], err = x509.ParseCertificate(asn1Data)
+		if err != nil {
+			return fmt.Errorf("Cert [%d]: %v",i, err)
+		}
+		pemData = append(pemData, strings.TrimSpace(string(pem.EncodeToMemory(&pem.Block{
+			Type:  "CERTIFICATE",
+			Bytes: certs[i].Raw,
+		}))))
+
+        }
+/*
+	for _, c := range certs {
+		pemData = append(pemData, strings.TrimSpace(string(pem.EncodeToMemory(&pem.Block{
+			Type:  "CERTIFICATE",
+			Bytes: c.Raw,
+		}))))
+	}
+*/
+	if err := os.WriteFile(certFile, []byte(strings.Join(pemData, "\n")), 0600); err != nil {
+		return fmt.Errorf("Error writing certificate file %q: %v", certFile, err)
+	}
+
+	return nil
+}
+
+// create certficate sign request
+func CreateCsrTpl(csrData CsrDat) (template x509.CertificateRequest) {
+
+	nam := csrData.Name
+	subj := pkix.Name{
+		CommonName:         nam.CommonName,
+		Country:            []string{nam.Country},
+		Province:           []string{nam.Province},
+		Locality:           []string{nam.Locality},
+		Organization:       []string{nam.Organisation},
+		OrganizationalUnit: []string{"Admin"},
+	}
+
+	rawSubj := subj.ToRDNSequence()
+
+	asn1Subj, _ := asn1.Marshal(rawSubj)
+	template = x509.CertificateRequest{
+		RawSubject:         asn1Subj,
+//  	EmailAddresses:     []string{emailAddress}, !not allowed for let's encrypt!!
+		SignatureAlgorithm: x509.ECDSAWithSHA256,
+		DNSNames: []string{csrData.Domain},
+	}
+	return template
 }
 
 func EncodeKey(privateKey *ecdsa.PrivateKey, publicKey *ecdsa.PublicKey) (string, string) {
@@ -200,6 +275,33 @@ func testKeyEncode() {
     }
 }
 */
+
+func ReadAcmeAcnt(filnam string) (acnt *acme.Account, err error) {
+
+	dat, err := os.ReadFile(filnam)
+	if err != nil {return nil, fmt.Errorf("os.ReadFile: %v", err)}
+
+	// decode dat
+	err = yaml.Unmarshal(dat, acnt)
+	if err != nil {return nil, fmt.Errorf("json.Unmarshal: %v", err)}
+
+	return acnt, nil
+}
+
+func SaveAcmeAcnt(acnt *acme.Account, filnam string) (err error) {
+
+	outfil, err := os.Create(filnam)
+	if err != nil {return fmt.Errorf("os.Create: %v", err)}
+
+	// encode dat
+	data, err :=yaml.Marshal(acnt)
+	if err != nil {return fmt.Errorf("json.Marshal: %v", err)}
+
+	_, err = outfil.Write(data)
+	if err != nil {return fmt.Errorf("acmefile Write: %v", err)}
+
+	return nil
+}
 
 func PrintCsr(csrlist *CsrList) {
 
