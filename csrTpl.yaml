@@ -1,0 +1,12 @@
+---
+template: csr
+certDir:
+domain:
+email:
+Name:
+  CommonName:
+  Country:
+  Province:
+  Locality:
+  Organisation:
+  OrganisationUnit:
