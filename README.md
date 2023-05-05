@@ -21,17 +21,17 @@ usage: ./createCerts csrList.yaml
 4. establish account with Lets Encrypt
 5. from LE get authorisation order for the domain target list (step 3) for DNS challenge
 6. for each domain:
-  1. get authorization url
-  2. get token
-  3. add DNS text record to domain nameserver
-  4. check by reading added Dns TXT record via lookup
-  5. inform LE 
-  6. confirm LE has validated challenge
-  7. delete DNS text record from name server
-  8. generate cert key and save as pem file in certDir
-  9. generate CSR request
-  10. submit CSR request to LE
-  11. retrieve cert as bundle (cert chain) and save as pem file in certDir
+   1. get authorization url
+   2. get token
+   3. add DNS text record to domain nameserver
+   4. check by reading added Dns TXT record via lookup
+   5. inform LE 
+   6. confirm LE has validated challenge
+   7. delete DNS text record from name server
+   8. generate cert key and save as pem file in certDir
+   9. generate CSR request
+   10. submit CSR request to LE
+   11. retrieve cert as bundle (cert chain) and save as pem file in certDir
 
 
 ### certLib
