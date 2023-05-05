@@ -29,6 +29,7 @@ import (
 
 type CsrList struct {
     Template string `yaml:"template"`
+	CertDir string `yaml:"certDir"`
     Domains []CsrDat `yaml:"domains"`
 }
 
@@ -324,6 +325,7 @@ func PrintCsr(csrlist *CsrList) {
 
     fmt.Println("******** Csr List *********")
     fmt.Printf("template: %s\n", csrlist.Template)
+	fmt.Printf("certDir:  %s\n", csrlist.CertDir)
     numDom := len(csrlist.Domains)
     fmt.Printf("domains: %d\n", numDom)
     for i:=0; i< numDom; i++ {
