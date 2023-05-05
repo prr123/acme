@@ -158,6 +158,23 @@ func RegisterClient(ctx context.Context, client *acme.Client, dbg bool)(ac *acme
     return acnt, nil
 }
 
+// generate cert names
+func GenerateCertName(domain string)(certName string, err error) {
+
+	domByt := []byte(domain)
+	suc := false
+	for i:=len(domByt); i> 0; i-- {
+		if domByt[i] == '.' {
+			domByt[i] = '_'
+			suc = true
+			break
+		}
+	}
+	if !suc {return "", fmt.Errorf("no extension with TLD found!")}
+
+	return certName, nil
+}
+
 // from https://github.com/eggsampler/acme/blob/master/examples/certbot/certbot.go#L269
 func SaveKeyPem(certKey *ecdsa.PrivateKey, keyFilNam string) (err error) {
 	certKeyEnc, err := x509.MarshalECPrivateKey(certKey)
