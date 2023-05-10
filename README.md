@@ -34,11 +34,65 @@ usage: ./createCerts csrList.yaml
    11. retrieve cert as bundle (cert chain) and save as pem file in certDir
 
 
-### certLib
+## certLib
 library that contains utility functions
 
+### ReadCsrFil
 
-### acmeDnsTest
+### NewClient
+generates a new acme client 
+
+### RegisterClient
+registers the client with Let's Encrypt and creates an LE account
+
+### GenCertName
+function that converts a domain name into name replacing periods with underscores
+
+### SaveKeyPem
+saves the private key in a file using the pem format
+
+### SaveCertsPem
+saves the certificate chain in a file using the pem format
+
+### CreateCSRTpl 
+create a CSR (Certificate Signing Request) template
+
+### EncodeKey
+converts a DER key into Pem byte slice
+
+### DecodeKey
+converts a Pem byte slice into a DER key
+
+### saveAcmeClient
+saves the private and public key of a client in PEM format
+
+### getAcmeClient
+reads the private and public keys from files and returns an acme client object
+
+### PrintCSR
+prints a CSR Object
+
+### PrintAccount
+prints an acme account object
+
+### PrintJsAccount
+
+### PrintClient
+prints an acme client object
+
+### PrintAuth
+prints an acme authorisation object
+
+### PrintDir
+prints an acme directory object
+
+### PrintOrder
+prints an acme order object
+
+### PrintChallenge
+prints an acme challenge object
+
+## acmeDnsTest
 programs that tested part of the Dns Challenge
 
 ## Other
