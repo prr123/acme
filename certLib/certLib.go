@@ -1,3 +1,4 @@
+// certLib.go
 // library that support the generation of certificates from Lets encrypt using the DNS Challenge
 // author: prr azul software
 // date: 29 April 2023
@@ -131,6 +132,8 @@ func NewClient(ctx context.Context, dbg bool) (cl *acme.Client, err error) {
 
     akey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
     if err != nil { return nil, fmt.Errorf("Generate Key: %v", err)}
+
+	//save key
 
     if dbg {log.Printf("newClient: key generated!\n")}
 
@@ -294,32 +297,68 @@ func testKeyEncode() {
 }
 */
 
-func ReadAcmeAcnt(filnam string) (acnt *acme.Account, err error) {
 
-	dat, err := os.ReadFile(filnam)
-	if err != nil {return nil, fmt.Errorf("os.ReadFile: %v", err)}
+// function that saves the keys in certDir
+func SaveAcmeClient(client *acme.Client, filNam string) (err error) {
 
-	// decode dat
-	err = yaml.Unmarshal(dat, acnt)
-	if err != nil {return nil, fmt.Errorf("json.Unmarshal: %v", err)}
+//	privateKey *ecdsa.PrivateKey
+	privateKey := (client.Key).(*ecdsa.PrivateKey)
 
-	return acnt, nil
+    var publicKey *ecdsa.PublicKey
+
+    publicKey = &privateKey.PublicKey
+
+    privKeyFilNam := filNam + "_priv.key"
+    pubKeyFilNam := filNam + "_pub.key"
+
+    x509Encoded, err := x509.MarshalECPrivateKey(privateKey)
+    if err != nil {return fmt.Errorf("x509.MarshalECPrivateKey: %v", err)}
+
+    pemEncoded := pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: x509Encoded})
+    err = os.WriteFile(privKeyFilNam, pemEncoded, 0644)
+    if err != nil {return fmt.Errorf("pem priv key write file: %v", err)}
+
+    x509EncodedPub, err := x509.MarshalPKIXPublicKey(publicKey)
+    if err != nil {return fmt.Errorf("x509.MarshalPKIXPublicKey: %v", err)}
+
+    pemEncodedPub := pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: x509EncodedPub})
+    err = os.WriteFile(pubKeyFilNam, pemEncodedPub, 0644)
+    if err != nil {return fmt.Errorf("pem pub key write file: %v", err)}
+
+    return nil
 }
 
-func SaveAcmeAcnt(acnt *acme.Account, filnam string) (err error) {
+// function to retrieve keys for LetsEncrypt acme account
+func GetAcmeClient(privFilNam, pubFilNam string) (cl *acme.Client, err error) {
 
-	outfil, err := os.Create(filnam)
-	if err != nil {return fmt.Errorf("os.Create: %v", err)}
+    var client acme.Client
 
-	// encode dat
-	data, err :=yaml.Marshal(acnt)
-	if err != nil {return fmt.Errorf("json.Marshal: %v", err)}
+    client.DirectoryURL = "https://acme-staging-v02.api.letsencrypt.org/directory"
+//	key *ecdsa.PrivateKey
 
-	_, err = outfil.Write(data)
-	if err != nil {return fmt.Errorf("acmefile Write: %v", err)}
+    pemEncoded, err := os.ReadFile(privFilNam)
+    if err != nil {return nil, fmt.Errorf("os.Read Priv Key: %v", err)}
 
-	return nil
+    pemEncodedPub, err := os.ReadFile(pubFilNam)
+    if err != nil {return nil, fmt.Errorf("os.Read Pub Key: %v", err)}
+
+    block, _ := pem.Decode([]byte(pemEncoded))
+    x509Encoded := block.Bytes
+    privateKey, err := x509.ParseECPrivateKey(x509Encoded)
+    if err != nil {return nil, fmt.Errorf("x509.ParseECPivateKey: %v", err)}
+
+    blockPub, _ := pem.Decode([]byte(pemEncodedPub))
+    x509EncodedPub := blockPub.Bytes
+    genericPublicKey, err := x509.ParsePKIXPublicKey(x509EncodedPub)
+    if err != nil {return nil, fmt.Errorf("x509.ParsePKIXKey: %v", err)}
+
+    publicKey := genericPublicKey.(*ecdsa.PublicKey)
+    privateKey.PublicKey = *publicKey
+
+	client.Key = privateKey
+    return &client, nil
 }
+
 
 func PrintCsr(csrlist *CsrList) {
 
