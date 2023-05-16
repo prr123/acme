@@ -108,6 +108,31 @@ type JsAcnt struct {
     ExternalAccountBinding *acme.ExternalAccountBinding `yaml: "ExtAcct"`
 }
 
+func GetCertDir()(certDir string, err error) {
+
+    certDir := os.Getenv("certDir")
+    if len(certDir) == 0 {
+		return "", fmt.Errorf("no env certDir found!")
+    }
+
+    // This returns an *os.FileInfo type
+    fileInfo, err := file.Stat(certDir)
+    if err != nil {
+		return "", fmt.Errorf("dir certDir not found: %v\n", err)
+    }
+
+    // IsDir is short for fileInfo.Mode().IsDir()
+    if !fileInfo.IsDir() {
+		return "", fmt.Errorf("certDir not a directory!\n")
+    }
+
+	byt := []byte(certDir)
+	if byt[len(byt)-1] != '/' {certDir += "/"}
+
+	return certDir, nil
+}
+
+
 
 func ReadCsrFil(inFilNam string)(csrDatList *CsrList, err error) {
 
