@@ -110,13 +110,13 @@ type JsAcnt struct {
 
 func GetCertDir()(certDir string, err error) {
 
-    certDir := os.Getenv("certDir")
+    certDir = os.Getenv("certDir")
     if len(certDir) == 0 {
 		return "", fmt.Errorf("no env certDir found!")
     }
 
     // This returns an *os.FileInfo type
-    fileInfo, err := file.Stat(certDir)
+    fileInfo, err := os.Stat(certDir)
     if err != nil {
 		return "", fmt.Errorf("dir certDir not found: %v\n", err)
     }
