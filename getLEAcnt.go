@@ -28,7 +28,6 @@ func main() {
 
 	useStr := "getAcnt"
 
-	certDir := "/home/peter/certDir/"
 
 	if numarg > 2 {
 		fmt.Println(useStr)
@@ -42,6 +41,10 @@ func main() {
 			os.Exit(1)
 		}
 	}
+
+	certDir, err := certLib.GetCertDir()
+	if err !=nil {log.Fatalf("GetCertDir: %v", err)}
+	log.Printf("Using certDir: %s\n", certDir)
 
 	// creating context
 	ctx := context.Background()
