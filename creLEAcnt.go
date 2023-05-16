@@ -26,7 +26,6 @@ func main() {
 
 	useStr := "creLEAcnt"
 
-	certDir := "/home/peter/certDir/"
 
 	if numarg > 2 {
 		fmt.Println(useStr)
@@ -41,6 +40,12 @@ func main() {
 		}
 	}
 
+	certDir, err := certLib.GetCertDir()
+	if err != nil {log.Fatalf("GetCert: %v", err)}
+
+	log.Printf("using certDir: %s\n", certDir)
+
+	// todo remove old cert files
 
 	// create new acme client
 	// creating context
