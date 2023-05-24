@@ -28,6 +28,15 @@ import (
     yaml "github.com/goccy/go-yaml"
 )
 
+type LEObj struct {
+	Client *acme.Client
+	Acnt *acme.Account
+	Contacts []string `yaml:"contacts"`
+	Dbg bool `yaml:"debug"`
+	Rem bool `yaml:"remove"`
+}
+
+
 type CsrList struct {
     Template string `yaml:"template"`
 	CertDir string `yaml:"certDir"`
@@ -108,22 +117,22 @@ type JsAcnt struct {
     ExternalAccountBinding *acme.ExternalAccountBinding `yaml: "ExtAcct"`
 }
 
-func GetCertDir()(certDir string, err error) {
+func GetCertDir(envVar string)(certDir string, err error) {
 
-    certDir = os.Getenv("certDir")
+    certDir = os.Getenv(envVar)
     if len(certDir) == 0 {
-		return "", fmt.Errorf("no env certDir found!")
+		return "", fmt.Errorf("no env %s found!", envVar)
     }
 
     // This returns an *os.FileInfo type
     fileInfo, err := os.Stat(certDir)
     if err != nil {
-		return "", fmt.Errorf("dir certDir not found: %v\n", err)
+		return "", fmt.Errorf("dir %s not found: %v\n", certDir, err)
     }
 
     // IsDir is short for fileInfo.Mode().IsDir()
     if !fileInfo.IsDir() {
-		return "", fmt.Errorf("certDir not a directory!\n")
+		return "", fmt.Errorf("%s not a directory!\n", certDir)
     }
 
 	byt := []byte(certDir)
@@ -131,7 +140,6 @@ func GetCertDir()(certDir string, err error) {
 
 	return certDir, nil
 }
-
 
 
 func ReadCsrFil(inFilNam string)(csrDatList *CsrList, err error) {
@@ -153,7 +161,62 @@ func ReadCsrFil(inFilNam string)(csrDatList *CsrList, err error) {
 }
 
 // function that creates a new client
-func NewClient(ctx context.Context, dbg bool) (cl *acme.Client, err error) {
+func CreateNewLEAccount() (le *LEObj, err error) {
+
+	var LEAcnt LEObj
+	
+	ctx := context.Background()
+
+	// find LE folder
+	LEDir, err := GetCertDir("LEAcnt")
+	if err != nil {
+		return nil, fmt.Errorf("GetCertDir: %v", err)
+	}
+
+	// check for existing keys and yaml file
+	contactFil := LEDir + "contacts.yaml"
+	contData, err := os.ReadFile(contactFil)
+	if err != nil {
+		return nil, fmt.Errorf("no contact yaml file: %v", err)
+	}
+
+	var leAcntDat LEObj
+    err = yaml.Unmarshal(contData, &leAcntDat)
+    if err != nil {
+        return nil, fmt.Errorf("yaml Unmarshal: %v\n", err)
+    }
+
+	dbg := leAcntDat.Dbg
+	remove := leAcntDat.Rem
+	if dbg {PrintLEAcnt(&leAcntDat)}
+
+	privFilnam := LEDir + "LE_priv.key"
+	pubFilnam := LEDir + "LE_pub.key"
+
+	_, err = os.Stat(privFilnam)
+	if err == nil {
+		if remove {
+			err2 := os.Remove(privFilnam)
+			if err2 != nil {return nil, fmt.Errorf("os.Remove: %v", err)}
+			log.Printf("removed private key file!")
+		} else {
+			return nil, fmt.Errorf("found private key!")
+		}
+	}
+
+
+	_, err = os.Stat(pubFilnam)
+	if err == nil {
+		if remove {
+			err2 := os.Remove(pubFilnam)
+			if err2 != nil {return nil, fmt.Errorf("os.Remove: %v", err)}
+			log.Printf("removed public key file!")
+		} else {
+			return nil, fmt.Errorf("found public key!")
+		}
+	}
+
+
 
     akey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
     if err != nil { return nil, fmt.Errorf("Generate Key: %v", err)}
@@ -170,13 +233,53 @@ func NewClient(ctx context.Context, dbg bool) (cl *acme.Client, err error) {
         log.Printf("success client created! printing client\n")
         PrintClient(client)
     }
-    return client, nil
+	LEAcnt.Client = client
+	LEAcnt.Contacts = leAcntDat.Contacts
+
+	var acntTpl acme.Account
+	acntTpl.Contact = leAcntDat.Contacts
+
+    acnt, err := client.Register(ctx, &acntTpl, acme.AcceptTOS)
+    if err != nil { return nil, fmt.Errorf("client.Register: %v", err)}
+
+	LEAcnt.Acnt = acnt
+
+	log.Printf("success CA account generated\n")
+
+    if dbg {PrintAccount(acnt)}
+
+	privateKey := (client.Key).(*ecdsa.PrivateKey)
+
+    var publicKey *ecdsa.PublicKey
+
+    publicKey = &privateKey.PublicKey
+
+    x509Encoded, err := x509.MarshalECPrivateKey(privateKey)
+    if err != nil {return nil, fmt.Errorf("x509.MarshalECPrivateKey: %v", err)}
+
+    pemEncoded := pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: x509Encoded})
+
+    err = os.WriteFile(privFilnam, pemEncoded, 0644)
+    if err != nil {return nil, fmt.Errorf("pem priv key write file: %v", err)}
+
+    x509EncodedPub, err := x509.MarshalPKIXPublicKey(publicKey)
+    if err != nil {return nil, fmt.Errorf("x509.MarshalPKIXPublicKey: %v", err)}
+
+    pemEncodedPub := pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: x509EncodedPub})
+    err = os.WriteFile(pubFilnam, pemEncodedPub, 0644)
+    if err != nil {return nil, fmt.Errorf("pem pub key write file: %v", err)}
+
+    return &LEAcnt, nil
 }
 
+/*
 // registers client with the acme server
-func RegisterClient(ctx context.Context, client *acme.Client, dbg bool)(ac *acme.Account, err error) {
+func RegisterClient(ctx context.Context, client *acme.Client, contacts []string, dbg bool)(ac *acme.Account, err error) {
 
-    acnt, err := client.Register(ctx, &acme.Account{}, acme.AcceptTOS)
+	var acntTpl acme.Account
+	acntTpl.Contact = contacts
+
+    acnt, err := client.Register(ctx, &acntTpl, acme.AcceptTOS)
     if err != nil { return nil, fmt.Errorf("client.Register: %v", err)}
 
     if dbg {
@@ -186,6 +289,7 @@ func RegisterClient(ctx context.Context, client *acme.Client, dbg bool)(ac *acme
 
     return acnt, nil
 }
+*/
 
 // generate cert names
 func GenerateCertName(domain string)(certName string, err error) {
@@ -354,12 +458,19 @@ func SaveAcmeClient(client *acme.Client, filNam string) (err error) {
 }
 
 // function to retrieve keys for LetsEncrypt acme account
-func GetAcmeClient(privFilNam, pubFilNam string) (cl *acme.Client, err error) {
+func GetAcmeClient() (cl *acme.Client, err error) {
+
+	LEDir, err := GetCertDir("LEAcnt")
+	if err != nil {
+		return nil, fmt.Errorf("GetCertDir LEAcnt: %v", err)
+	}
+
+	privFilNam := LEDir + "LE_priv.key"
+	pubFilNam := LEDir + "LE_pub.key"
 
     var client acme.Client
 
     client.DirectoryURL = "https://acme-staging-v02.api.letsencrypt.org/directory"
-//	key *ecdsa.PrivateKey
 
     pemEncoded, err := os.ReadFile(privFilNam)
     if err != nil {return nil, fmt.Errorf("os.Read Priv Key: %v", err)}
@@ -408,6 +519,18 @@ func PrintCsr(csrlist *CsrList) {
 
     fmt.Println("******** End Csr List *******")
 
+}
+
+func PrintLEAcnt(acnt *LEObj) {
+
+	fmt.Printf("*********** LEAcnt ******\n")
+
+	fmt.Printf("remove:  %t\n", acnt.Rem)
+	fmt.Printf("debug:   %t\n", acnt.Dbg)
+	fmt.Printf("contacts: %d\n", len(acnt.Contacts))
+	for i:=0; i< len(acnt.Contacts); i++ {
+		fmt.Printf("contact[%d]: %s\n", i+1, acnt.Contacts[i])
+	}
 }
 
 
