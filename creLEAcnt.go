@@ -40,43 +40,19 @@ func main() {
 		}
 	}
 
-	certDir, err := certLib.GetCertDir()
-	if err != nil {log.Fatalf("GetCert: %v", err)}
 
-	log.Printf("using certDir: %s\n", certDir)
+	leobj, err := certLib.CreateNewLEAccount()
+	if err != nil {log.Fatalf("CreateNewAccount: %v\n", err)}
 
-	// todo remove old cert files
+	client := leobj.Client
+	if leobj.Dbg {certLib.PrintAccount(leobj.Acnt)}
 
-	// create new acme client
-	// creating context
 	ctx := context.Background()
-
-	client, err := certLib.NewClient(ctx, dbg)
-	if err != nil {log.Fatalf("newClient: %v\n", err)}
-
-	log.Printf("success creating acme client!\n")
-	if dbg {certLib.PrintClient(client)}
-
-	filNam := certDir + "LE"
-
-
-//	acnt, err := certLib.ReadAcmeAcnt(savActFilNam)
-//	if err != nil {
-	log.Printf("Creating Account\n")
-	acnt, err := certLib.RegisterClient(ctx, client, dbg)
-	if err != nil {log.Fatalf("registerClient: %v\n", err)}
-	log.Printf("success registering client and creating account!")
-
-	if dbg {certLib.PrintAccount(acnt)}
-
-	dir, err := client.Discover(ctx)
+	ledir, err := client.Discover(ctx)
 	if err != nil {log.Fatalf("Discover error: %v\n", err)}
 
 	log.Printf("success getting client dir\n")
-	if dbg {certLib.PrintDir(dir)}
-
-	err = certLib.SaveAcmeClient(client, filNam)
-	if err != nil {log.Fatalf("SaceAcmeClient: %v\n", err)}
+	if leobj.Dbg {certLib.PrintDir(ledir)}
 
 }
 
