@@ -272,6 +272,72 @@ func CreateNewLEAccount() (le *LEObj, err error) {
     return &LEAcnt, nil
 }
 
+func GetLEClient() (cl *acme.Client, err error) {
+
+	var client acme.Client
+//	ctx := context.Background()
+
+	// find LE folder
+	LEDir, err := GetCertDir("LEAcnt")
+	if err != nil {
+		return nil, fmt.Errorf("GetCertDir: %v", err)
+	}
+
+	// check for existing keys and yaml file
+	contactFil := LEDir + "contacts.yaml"
+	contData, err := os.ReadFile(contactFil)
+	if err != nil {
+		return nil, fmt.Errorf("no contact yaml file: %v", err)
+	}
+
+	var leAcntDat LEObj
+    err = yaml.Unmarshal(contData, &leAcntDat)
+    if err != nil {
+        return nil, fmt.Errorf("yaml Unmarshal: %v\n", err)
+    }
+
+	dbg := leAcntDat.Dbg
+//	remove := leAcntDat.Rem
+	if dbg {PrintLEAcnt(&leAcntDat)}
+
+	privFilnam := LEDir + "LE_priv.key"
+	pubFilnam := LEDir + "LE_pub.key"
+
+	_, err = os.Stat(privFilnam)
+	if err != nil {
+		return nil, fmt.Errorf("no private key file: %v", err)
+	}
+
+	_, err = os.Stat(pubFilnam)
+	if err != nil {
+		return nil, fmt.Errorf("no public key file: %v", err)
+	}
+
+    client.DirectoryURL = "https://acme-staging-v02.api.letsencrypt.org/directory"
+
+    pemEncoded, err := os.ReadFile(privFilnam)
+    if err != nil {return nil, fmt.Errorf("os.Read Priv Key: %v", err)}
+
+    pemEncodedPub, err := os.ReadFile(pubFilnam)
+    if err != nil {return nil, fmt.Errorf("os.Read Pub Key: %v", err)}
+
+    block, _ := pem.Decode([]byte(pemEncoded))
+    x509Encoded := block.Bytes
+    privateKey, err := x509.ParseECPrivateKey(x509Encoded)
+    if err != nil {return nil, fmt.Errorf("x509.ParseECPivateKey: %v", err)}
+
+    blockPub, _ := pem.Decode([]byte(pemEncodedPub))
+    x509EncodedPub := blockPub.Bytes
+    genericPublicKey, err := x509.ParsePKIXPublicKey(x509EncodedPub)
+    if err != nil {return nil, fmt.Errorf("x509.ParsePKIXKey: %v", err)}
+
+    publicKey := genericPublicKey.(*ecdsa.PublicKey)
+    privateKey.PublicKey = *publicKey
+
+	client.Key = privateKey
+    return &client, nil
+}
+
 /*
 // registers client with the acme server
 func RegisterClient(ctx context.Context, client *acme.Client, contacts []string, dbg bool)(ac *acme.Account, err error) {
@@ -460,6 +526,8 @@ func SaveAcmeClient(client *acme.Client, filNam string) (err error) {
 // function to retrieve keys for LetsEncrypt acme account
 func GetAcmeClient() (cl *acme.Client, err error) {
 
+    var client acme.Client
+
 	LEDir, err := GetCertDir("LEAcnt")
 	if err != nil {
 		return nil, fmt.Errorf("GetCertDir LEAcnt: %v", err)
@@ -467,8 +535,6 @@ func GetAcmeClient() (cl *acme.Client, err error) {
 
 	privFilNam := LEDir + "LE_priv.key"
 	pubFilNam := LEDir + "LE_pub.key"
-
-    var client acme.Client
 
     client.DirectoryURL = "https://acme-staging-v02.api.letsencrypt.org/directory"
 
@@ -642,4 +708,25 @@ func PrintChallenge(chal *acme.Challenge, domain string) {
     fmt.Printf("Validated: %s\n", chal.Validated.Format(time.RFC1123))
     fmt.Printf("Error: %v\n", chal.Error)
     fmt.Printf("*************** End Challenge ********\n")
+}
+
+func PrintCert(cert *x509.Certificate) {
+
+	fmt.Println("************ Certificate **************")
+
+	fmt.Printf("Version: %d\n", cert.Version)
+	fmt.Printf("Serial:  %d\n", cert.SerialNumber)
+	fmt.Printf("Issuer: \n")
+	namIssuer := cert.Issuer
+	fmt.Printf("  Countries: %d\n", len(namIssuer.Country))
+	if len(namIssuer.Country)>0 {
+		fmt.Printf("    Country: %s\n", namIssuer.Country[0])
+	}
+	fmt.Printf("Subject: \n")
+
+	fmt.Printf("Start: %s\n", cert.NotBefore.Format(time.RFC1123))
+	fmt.Printf("End:   %s\n", cert.NotAfter.Format(time.RFC1123))
+
+	fmt.Println("********** End Certificate ************")
+
 }
