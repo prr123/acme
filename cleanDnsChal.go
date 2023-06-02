@@ -38,14 +38,18 @@ func main() {
 	useStr := "cleanSnsChal [domainfile]"
 
 	zoneDir := os.Getenv("zoneDir")
-	if len(zoneDir) < 1 {
-		log.Fatalf("env Var zoneDir not found!\n")
-	}
-	log.Printf("fond zoneDir: %s\n", zoneDir)
-
+	if len(zoneDir) < 1 {log.Fatalf("env Var zoneDir not found!\n")}
+	log.Printf("found zoneDir: %s\n", zoneDir)
     zoneFilNam := zoneDir + "/cfDomainsShort.yaml"
 
 	csrFilNam := "csrList.yaml"
+
+	cfDir := os.Getenv("Cloudflare")
+	if len(cfDir) < 1 {log.Fatalf("env Var Cloudflare not found!\n")}
+	log.Printf("found Cloudflare: %s\n", cfDir)
+    cfApiFilnam := cfDir + "/token/cfDns.yaml"
+
+
 
 	if numarg > 2 {
 		fmt.Println(useStr)
@@ -89,14 +93,6 @@ func main() {
     log.Printf("found %d acme Domains\n", numAcmeDom)
 
 	if dbg {certLib.PrintCsr(csrList)}
-
-
-/*
-	certDir := csrList.CertDir
-	certdir := []byte(csrList.CertDir)
-	if certdir[len(certdir) - 1] != '/' {certDir += "/"}
-	log.Printf("certDir: %s\n", certDir)
-*/
 
 	acmeDomList := make([]cfLib.ZoneAcme, numAcmeDom)
 	// see whether acme domains are in zoneList
@@ -150,10 +146,10 @@ func main() {
 		os.Exit(1)
 	}
 
-	log.Printf("found %d Domains with residual DNS Challenge records!\n")
+	log.Printf("found %d Domains with residual DNS Challenge records!\n", foundAcme)
 
 	// get api for DNS use default yaml file
-	cfapi, err := cfLib.InitCfApi("")
+	cfapi, err := cfLib.InitCfApi(cfApiFilnam)
 	if err != nil {log.Fatalf("cfLib.InitCfApi: %v\n", err)}
 	log.Printf("success: init cfapi\n")
 
