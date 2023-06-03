@@ -594,7 +594,7 @@ func PrintCsr(csrlist *CsrList) {
     fmt.Println("******** Csr List *********")
     fmt.Printf("template: %s\n", csrlist.Template)
 	fmt.Printf("certDir:  %s\n", csrlist.CertDir)
-	fmt.Print("last lookup: %s\n", csrlist.LastLU.Format(time.RFC1123))
+	fmt.Printf("last lookup: %s\n", csrlist.LastLU.Format(time.RFC1123))
     numDom := len(csrlist.Domains)
     fmt.Printf("domains: %d\n", numDom)
     for i:=0; i< numDom; i++ {
