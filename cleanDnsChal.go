@@ -11,17 +11,17 @@
 package main
 
 import (
-	"context"
-
+//	"context"
 	"log"
 	"fmt"
 	"os"
 	"net"
+	"time"
 	"strings"
 
 //    yaml "github.com/goccy/go-yaml"
 //	"golang.org/x/crypto/acme"
-	"github.com/cloudflare/cloudflare-go"
+//	"github.com/cloudflare/cloudflare-go"
 
     cfLib "acme/acmeDns/cfLib"
 	certLib "acme/acmeDns/certLib"
@@ -40,9 +40,9 @@ func main() {
 	zoneDir := os.Getenv("zoneDir")
 	if len(zoneDir) < 1 {log.Fatalf("env Var zoneDir not found!\n")}
 	log.Printf("found zoneDir: %s\n", zoneDir)
-    zoneFilNam := zoneDir + "/cfDomainsShort.yaml"
+    zoneFilnam := zoneDir + "/cfDomainsShort.yaml"
 
-	csrFilNam := "csrList.yaml"
+	csrFilnam := "csrList.yaml"
 
 	cfDir := os.Getenv("Cloudflare")
 	if len(cfDir) < 1 {log.Fatalf("env Var Cloudflare not found!\n")}
@@ -62,17 +62,14 @@ func main() {
 			fmt.Println(useStr)
 			os.Exit(1)
 		}
-		csrFilNam = os.Args[1]
+		csrFilnam = os.Args[1]
 	}
 
-	log.Printf("Using zone file: %s\n", zoneFilNam)
-	log.Printf("Using csr file: %s\n", csrFilNam)
-
-    // creating context
-    ctx := context.Background()
+	log.Printf("Using zone file: %s\n", zoneFilnam)
+	log.Printf("Using csr file: %s\n", csrFilnam)
 
 	// reading all domain names served by cloudflare
-    zoneList, err := cfLib.ReadZoneShortFile(zoneFilNam)
+    zoneList, err := cfLib.ReadZoneShortFile(zoneFilnam)
     if err != nil {log.Fatalf("ReadZoneFileShort: %v\n", err)}
 
 	log.Printf("success reading all cf zones!\n")
@@ -81,11 +78,11 @@ func main() {
 	numZones := len(zoneList.Zones)
 
 	log.Printf("Acme Chal Domain Target: %d\n", numZones)
-	if numZones == 0 {log.Fatalf("no domains in file: %s\n", zoneFilNam)}
+	if numZones == 0 {log.Fatalf("no domains in file: %s\n", zoneFilnam)}
 
 
 	// read list of all domains for Acme Challenge
-    csrList, err := certLib.ReadCsrFil(csrFilNam)
+    csrList, err := certLib.ReadCsrFil(csrFilnam)
     if err != nil {log.Fatalf("ReadCsrFil: %v\n", err)}
 	log.Printf("success reading CsrFile!\n")
 
@@ -149,42 +146,47 @@ func main() {
 	log.Printf("found %d Domains with residual DNS Challenge records!\n", foundAcme)
 
 	// get api for DNS use default yaml file
-	cfapi, err := cfLib.InitCfApi(cfApiFilnam)
+	apiObj, err := cfLib.InitCfApi(cfApiFilnam)
 	if err != nil {log.Fatalf("cfLib.InitCfApi: %v\n", err)}
 	log.Printf("success: init cfapi\n")
-
-	// check acme target domains for left-over acme records
-	var listDns cloudflare.ListDNSRecordsParams
-	var rc cloudflare.ResourceContainer
-	rc.Level = cloudflare.ZoneRouteLevel
-
-	cf := cfapi.API
 
 	for i:=0; i< numAcmeDom; i++ {
 		if !acmeDomList[i].AcmeRec {continue}
 
 		domain := acmeDomList[i].Name
 		log.Printf("cleaning domain[%d]: %s\n", i+1, domain)
-		rc.Identifier = acmeDomList[i].Id
 
-		dnsRecs, _, err := cf.ListDNSRecords(ctx, &rc, listDns)
+		zoneId := acmeDomList[i].Id
+		dnsRecs, err := apiObj.ListDnsRecords(zoneId)
 		if err != nil {log.Fatalf("domain[%d]: %s api.ListDNSRecords: %v\n", i+1, domain, err)}
 
-		if dbg {cfLib.PrintDnsRecs(&dnsRecs)}
+		if dbg {cfLib.PrintDnsRecs(dnsRecs)}
 
 		dnsId := ""
-        for j:=0; j< len(dnsRecs); j++ {
-			idx := strings.Index(dnsRecs[j].Name, "_acme-challenge.")
+        for j:=0; j< len(*dnsRecs); j++ {
+			idx := strings.Index((*dnsRecs)[j].Name, "_acme-challenge.")
             if idx == 0 {
-                dnsId = dnsRecs[j].ID
+                dnsId = (*dnsRecs)[j].ID
 				log.Printf("found acme challenge record[%d] in domain %s\n", j+1, domain)
-				err = cf.DeleteDNSRecord(ctx, &rc, dnsId)
+				err = apiObj.DelDnsRec(zoneId, dnsId)
 				if err != nil {log.Fatalf("api.DeleteDNSRecord: %v\n", err)}
 				log.Println("deleted Acme Dns Record")
 			}
 		}
 	}
 
-	log.Printf("finished cleaning acme records\n")
+	log.Printf("finished cleaning acme dns records\n")
 
+	log.Printf("cleaning csr file\n")
+
+	for i:= 0; i< numAcmeDom; i++ {
+		domain := csrList.Domains[i]
+		if len(domain.Token) > 0 {domain.Token = ""}
+		if !domain.TokExp.IsZero() {domain.TokExp = time.Time{}}
+	}
+
+	csrList.LastLU = time.Now()
+	err = certLib.WriteCsrFil(csrFilnam, csrList)
+	if err != nil {log.Fatalf("certLib.WriteCsrFil: %v\n", err)}
+	log.Printf("success writing Csr File\n")
 }
