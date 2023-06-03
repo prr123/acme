@@ -51,16 +51,21 @@ type LEObj struct {
 type CsrList struct {
     Template string `yaml:"template"`
 	CertDir string `yaml:"certDir"`
-    Domains []CsrDat `yaml:"domains"`
 	LastLU time.Time `yaml:"last"`
+	OrderUrl string `yaml:"orderUrl"`
+    Domains []CsrDat `yaml:"domains"`
 }
 
 type CsrDat struct {
     Domain string `yaml:"domain"`
     Email string `yaml:"email"`
     PemFil string `yaml:"pemfil"`
+	ChalRecId string `yaml:"chalrec"`
 	Token	string `yaml:"token"`
-	TokExp	time.Time `yaml:"expire"`
+	TokVal string `yaml:"tokval"`
+	TokUrl string `yaml:"tokUrl"`
+	TokIssue time.Time `yaml:"issue"`
+	TokExp time.Time `yaml:"expire"`
     Name pkixName `yaml:"Name"`
 }
 
@@ -611,10 +616,10 @@ func PrintCsr(csrlist *CsrList) {
 		} else {
 	     	fmt.Printf("  token:    NA\n")
 		}
-		if csrdat.TokExp.IsZero() {
-			fmt.Printf("  tok exp:  NA\n")
+		if csrdat.TokIssue.IsZero() {
+			fmt.Printf("  tok issue:  NA\n")
 		} else {
-			fmt.Printf("  tok exp:  %s\n", csrdat.TokExp.Format(time.RFC1123))
+			fmt.Printf("  tok issue:  %s\n", csrdat.TokIssue.Format(time.RFC1123))
 		}
 	    fmt.Printf("  name:\n")
         nam:= csrdat.Name
@@ -697,6 +702,21 @@ func PrintAuth(auth *acme.Authorization) {
     fmt.Println("*********** end authorization ***********")
 }
 
+func PrintChallenge(chal *acme.Challenge, domain string) {
+    fmt.Printf("*************** Challenge for domain: %s *******\n", domain)
+    fmt.Printf("Type:     %s\n", chal.Type)
+    fmt.Printf("URI:      %s\n", chal.URI)
+    fmt.Printf("Token:    %s\n", chal.Token)
+    fmt.Printf("Status:   %s\n", chal.Status)
+	if chal.Validated.IsZero() {
+    	fmt.Printf("Validate: NA\n")
+	} else {
+    	fmt.Printf("Validate: %s\n", chal.Validated.Format(time.RFC1123))
+	}
+    fmt.Printf("Error:    %v\n", chal.Error)
+    fmt.Printf("*************** End Challenge *****************\n")
+}
+
 func PrintDomains(domains []string) {
     fmt.Printf("*****  domains: %d *******\n", len(domains))
     for i, domain := range domains {
@@ -742,16 +762,6 @@ func PrintOrder(ord acme.Order) {
 
 }
 
-func PrintChallenge(chal *acme.Challenge, domain string) {
-    fmt.Printf("*************** Challenge Dmain: %s *******\n", domain)
-    fmt.Printf("Type:     %s\n", chal.Type)
-    fmt.Printf("URI:      %s\n", chal.URI)
-    fmt.Printf("Token:    %s\n", chal.Token)
-    fmt.Printf("Status:   %s\n", chal.Status)
-    fmt.Printf("Validate: %s\n", chal.Validated.Format(time.RFC1123))
-    fmt.Printf("Error:    %v\n", chal.Error)
-    fmt.Printf("*************** End Challenge *************\n")
-}
 
 func PrintCert(cert *x509.Certificate) {
 
