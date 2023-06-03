@@ -12,7 +12,6 @@ import (
     "fmt"
     "os"
     "time"
-//    "net"
     "context"
 	"strings"
     "crypto/ecdsa"
@@ -28,6 +27,18 @@ import (
     yaml "github.com/goccy/go-yaml"
 )
 
+/*
+type ChalList struct {
+	Date time.Time `yaml:"Date"`
+	ChalObjs []ChalObj `yaml:"ChalObjects"`
+}
+
+type ChalObj struct {
+	Domain string `yaml:"Domain"`
+	Type string `yaml:"Type"`
+}
+*/
+
 type LEObj struct {
 	Client *acme.Client
 	Acnt *acme.Account
@@ -41,12 +52,15 @@ type CsrList struct {
     Template string `yaml:"template"`
 	CertDir string `yaml:"certDir"`
     Domains []CsrDat `yaml:"domains"`
+	Last time.Time `yaml:"last"`
 }
 
 type CsrDat struct {
     Domain string `yaml:"domain"`
     Email string `yaml:"email"`
     PemFil string `yaml:"pemfil"`
+	Token	string `yaml:"token"`
+	TokExp	time.Time `yaml:"expire"`
     Name pkixName `yaml:"Name"`
 }
 
@@ -142,6 +156,7 @@ func GetCertDir(envVar string)(certDir string, err error) {
 }
 
 
+// functions that reads CSRList from a file
 func ReadCsrFil(inFilNam string)(csrDatList *CsrList, err error) {
 
     //todo check for yaml extension
@@ -158,6 +173,20 @@ func ReadCsrFil(inFilNam string)(csrDatList *CsrList, err error) {
 
 //    PrintCsr(CsrList)
     return csrList, nil
+}
+
+func WriteCsrFil(outFilnam string, csrDatList *CsrList) (err error) {
+
+    csrByte, err := yaml.Marshal(csrDatList)
+	if err!= nil {
+		return fmt.Errorf("Marshal: %v\n",err)
+	}
+
+	err = os.WriteFile(outFilnam, csrByte, 0666)
+	if err!= nil {
+		return fmt.Errorf("WriteFile: %v\n",err)
+	}
+	return nil
 }
 
 // function that creates a new client
@@ -203,7 +232,6 @@ func CreateNewLEAccount() (le *LEObj, err error) {
 			return nil, fmt.Errorf("found private key!")
 		}
 	}
-
 
 	_, err = os.Stat(pubFilnam)
 	if err == nil {
@@ -567,13 +595,16 @@ func PrintCsr(csrlist *CsrList) {
     fmt.Println("******** Csr List *********")
     fmt.Printf("template: %s\n", csrlist.Template)
 	fmt.Printf("certDir:  %s\n", csrlist.CertDir)
+	fmt.Print("last lookup: %s\n", csrlist.Last)
     numDom := len(csrlist.Domains)
     fmt.Printf("domains: %d\n", numDom)
     for i:=0; i< numDom; i++ {
         csrdat := csrlist.Domains[i]
         fmt.Printf("  domain:   %s\n", csrdat.Domain)
         fmt.Printf("  email:    %s\n", csrdat.Email)
-        fmt.Printf("  name:\n")
+     	fmt.Printf("  token:    %s\n", csrdat.Token)
+		fmt.Printf("  tok exp:  %s\n", csrdat.TokExp.Format(time.RFC1123))
+	    fmt.Printf("  name:\n")
         nam:= csrdat.Name
         fmt.Printf("    CommonName:   %s\n", nam.CommonName)
         fmt.Printf("    Country:      %s\n", nam.Country)
@@ -700,14 +731,14 @@ func PrintOrder(ord acme.Order) {
 }
 
 func PrintChallenge(chal *acme.Challenge, domain string) {
-    fmt.Printf("*************** %s Challenge ********\n", domain)
-    fmt.Printf("Type: %s\n", chal.Type)
-    fmt.Printf("URI:  %s\n", chal.URI)
-    fmt.Printf("Token: %s\n", chal.Token)
-    fmt.Printf("Status: %s\n", chal.Status)
-    fmt.Printf("Validated: %s\n", chal.Validated.Format(time.RFC1123))
-    fmt.Printf("Error: %v\n", chal.Error)
-    fmt.Printf("*************** End Challenge ********\n")
+    fmt.Printf("*************** Challenge Dmain: %s *******\n", domain)
+    fmt.Printf("Type:     %s\n", chal.Type)
+    fmt.Printf("URI:      %s\n", chal.URI)
+    fmt.Printf("Token:    %s\n", chal.Token)
+    fmt.Printf("Status:   %s\n", chal.Status)
+    fmt.Printf("Validate: %s\n", chal.Validated.Format(time.RFC1123))
+    fmt.Printf("Error:    %v\n", chal.Error)
+    fmt.Printf("*************** End Challenge *************\n")
 }
 
 func PrintCert(cert *x509.Certificate) {
