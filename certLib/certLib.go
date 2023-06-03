@@ -594,15 +594,28 @@ func PrintCsr(csrlist *CsrList) {
     fmt.Println("******** Csr List *********")
     fmt.Printf("template: %s\n", csrlist.Template)
 	fmt.Printf("certDir:  %s\n", csrlist.CertDir)
-	fmt.Printf("last lookup: %s\n", csrlist.LastLU.Format(time.RFC1123))
+	if csrlist.LastLU.IsZero() {
+		fmt.Printf("last lookup: NA\n")
+	} else {
+		fmt.Printf("last lookup: %s\n", csrlist.LastLU.Format(time.RFC1123))
+	}
     numDom := len(csrlist.Domains)
     fmt.Printf("domains: %d\n", numDom)
     for i:=0; i< numDom; i++ {
         csrdat := csrlist.Domains[i]
+		fmt.Printf("  ***************************\n")
         fmt.Printf("  domain:   %s\n", csrdat.Domain)
         fmt.Printf("  email:    %s\n", csrdat.Email)
-     	fmt.Printf("  token:    %s\n", csrdat.Token)
-		fmt.Printf("  tok exp:  %s\n", csrdat.TokExp.Format(time.RFC1123))
+		if len(csrdat.Token) > 0 {
+	     	fmt.Printf("  token:    %s\n", csrdat.Token)
+		} else {
+	     	fmt.Printf("  token:    NA\n")
+		}
+		if csrdat.TokExp.IsZero() {
+			fmt.Printf("  tok exp:  NA\n")
+		} else {
+			fmt.Printf("  tok exp:  %s\n", csrdat.TokExp.Format(time.RFC1123))
+		}
 	    fmt.Printf("  name:\n")
         nam:= csrdat.Name
         fmt.Printf("    CommonName:   %s\n", nam.CommonName)
