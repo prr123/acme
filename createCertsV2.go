@@ -371,8 +371,8 @@ ProcOrder:
 	log.Printf("arrived at ProcOrd\n")
 
 //	orderUrl := order.URI
-	orderUrl := csrList.OrderUrl
-	if len(orderUrl) == 0 {log.Fatalf("no order Url in CsrListFile!\n")}
+	certUrl := csrList.OrderUrl
+	if len(certUrl) == 0 {log.Fatalf("no order Url in CsrListFile!\n")}
 
 	// ready for sending an accept; checked dns propogation with lookup
 	for i:=0; i< numAcmeDom; i++ {
@@ -397,12 +397,11 @@ ProcOrder:
 
 	}
 
-	tmpord, err := client.GetOrder(ctx, orderUrl)
+	tmpord, err := client.GetOrder(ctx, certUrl)
 	if err !=nil {log.Fatalf("order error: %v\n", err)}
 	if dbg {certLib.PrintOrder(*tmpord)}
 
     log.Printf("waiting for order\n")
-	certUrl := order.URI
 	if dbg {log.Printf("order url: %s\n", certUrl)}
 
     ord2, err := client.WaitOrder(ctx, certUrl)
@@ -417,15 +416,17 @@ ProcOrder:
 	for i:=0; i< numAcmeDom; i++ {
 
 		csrData := csrList.Domains[i]
+
 		//certLib.PrintCsr(csrData)
 		domain := csrData.Domain
 		log.Printf("generating certificate for domain: %s\n", domain)
 		// get certificates
 		certNam, err :=certLib.GenerateCertName(domain)
 		if err != nil {log.Fatalf("GenerateCertName: %v", err)}
+		if dbg {log.Printf("certNam: %s\n", certNam)}
 
-		keyFilnam := certDir + certNam + ".key"
-		certFilnam := certDir + certNam + ".crt"
+		keyFilnam := certDir + "/" + certNam + ".key"
+		certFilnam := certDir + "/" + certNam + ".crt"
 		log.Printf("key file: %s cert file: %s\n", keyFilnam, certFilnam)
 
 		certKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
@@ -442,15 +443,17 @@ ProcOrder:
 		if err != nil {	log.Fatalf("CreateCertReq: %v",err)}
 
 
-		csrParse, err := x509.ParseCertificateRequest(csr)
+		csrParseReq, err := x509.ParseCertificateRequest(csr)
+//		_, err := x509.ParseCertificateRequest(csr)
 		if err != nil {log.Fatalf("Error parsing certificate request: %v", err)}
 
 		// need to compare csrParse and template
-		fmt.Printf("csrParse: %v\n", csrParse)
+		certLib.PrintCsrReq(csrParseReq)
 
-		ordUrl := ord2.FinalizeURL
+		FinalUrl := ord2.FinalizeURL
+		log.Printf("FinalUrl: %s\n", FinalUrl)
 
-		derCerts, certUrl, err := client.CreateOrderCert(ctx, ordUrl, csr, true)
+		derCerts, certUrl, err := client.CreateOrderCert(ctx, FinalUrl, csr, true)
 		if err != nil {log.Fatalf("CreateOrderCert: %v\n",err)}
 
 		log.Printf("derCerts: %d certUrl: %s\n", len(derCerts), certUrl)
