@@ -186,10 +186,12 @@ func WriteCsrFil(outFilnam string, csrDatList *CsrList) (err error) {
 		return fmt.Errorf("Marshal: %v\n",err)
 	}
 
-	err = os.WriteFile(outFilnam, csrByte, 0666)
-	if err!= nil {
-		return fmt.Errorf("WriteFile: %v\n",err)
-	}
+	outfil, err := os.Create(outFilnam)
+	if err!= nil {return fmt.Errorf("CreateFile: %v\n",err)}
+
+//	err = os.WriteFile(outFilnam, csrByte, 0666)
+	_, err = outfil.Write(csrByte)
+	if err!= nil {return fmt.Errorf("WriteFile: %v\n",err)}
 	return nil
 }
 
@@ -611,16 +613,21 @@ func PrintCsr(csrlist *CsrList) {
 		fmt.Printf("  ***************************\n")
         fmt.Printf("  domain:   %s\n", csrdat.Domain)
         fmt.Printf("  email:    %s\n", csrdat.Email)
-		if len(csrdat.Token) > 0 {
-	     	fmt.Printf("  token:    %s\n", csrdat.Token)
-		} else {
-	     	fmt.Printf("  token:    NA\n")
-		}
+		fmt.Printf("  chal rec: %s\n", csrdat.ChalRecId)
+     	fmt.Printf("  token:    %s\n", csrdat.Token)
+		fmt.Printf("  tokval:   %s\n", csrdat.TokVal)
+		fmt.Printf("  tokUrl:   %s\n", csrdat.TokUrl)
 		if csrdat.TokIssue.IsZero() {
 			fmt.Printf("  tok issue:  NA\n")
 		} else {
 			fmt.Printf("  tok issue:  %s\n", csrdat.TokIssue.Format(time.RFC1123))
 		}
+		if csrdat.TokExp.IsZero() {
+			fmt.Printf("  tok exp:    NA\n")
+		} else {
+			fmt.Printf("  tok exp:    %s\n", csrdat.TokExp.Format(time.RFC1123))
+		}
+
 	    fmt.Printf("  name:\n")
         nam:= csrdat.Name
         fmt.Printf("    CommonName:   %s\n", nam.CommonName)
@@ -689,7 +696,7 @@ func PrintClient (client *acme.Client) {
 }
 
 func PrintAuth(auth *acme.Authorization) {
-    fmt.Println("*********** authorization ***********")
+    fmt.Println("************************* authorization *********************")
     fmt.Printf("URI:    %s\n", auth.URI)
     fmt.Printf("Status: %s\n", auth.Status)
     fmt.Printf("Id typ: %s val: %s\n", auth.Identifier.Type, auth.Identifier.Value)
@@ -699,7 +706,7 @@ func PrintAuth(auth *acme.Authorization) {
     for i, chal := range auth.Challenges {
         fmt.Printf("   [%d]: %s URI: %s Token: %s Status: %s err: %v\n", i+1, chal.Type, chal.URI, chal.Token, chal.Status, chal.Error)
 	}
-    fmt.Println("*********** end authorization ***********")
+    fmt.Println("********************** end authorization ********************")
 }
 
 func PrintChallenge(chal *acme.Challenge, domain string) {
@@ -727,7 +734,7 @@ func PrintDomains(domains []string) {
 
 func PrintDir(dir acme.Directory) {
 
-    fmt.Println("********** Directory **********")
+    fmt.Println("************************* Directory **********************")
     fmt.Printf("AuthzUrl: %s\n", dir.AuthzURL)
     fmt.Printf("OrderUrl: %s\n", dir.OrderURL)
     fmt.Printf("RevokeUrl: %s\n", dir.RevokeURL)
@@ -737,11 +744,11 @@ func PrintDir(dir acme.Directory) {
     fmt.Printf("Meta Website: %s\n", dir.Website)
     fmt.Printf("Meta CAA: %s\n", dir.CAA)
     fmt.Printf("External Account Req: %v\n", dir.ExternalAccountRequired)
-    fmt.Println("******* End Directory *********")
+    fmt.Println("********************** End Directory *********************")
 }
 
 func PrintOrder(ord acme.Order) {
-    fmt.Println("************ Order **************")
+    fmt.Println("*********************** Order ****************************")
     fmt.Printf("URI: %s\n", ord.URI)
     fmt.Printf("Status: %s\n", ord.Status)
     fmt.Printf("Expires: %s\n", ord.Expires.Format(time.RFC1123))
@@ -758,7 +765,7 @@ func PrintOrder(ord acme.Order) {
     fmt.Printf("FinalizeURL: %s\n", ord.FinalizeURL)
     fmt.Printf("CertURL: %s\n", ord.CertURL)
     fmt.Printf("error: %v\n", ord.Error)
-    fmt.Println("********* End Order **************")
+    fmt.Println("******************* End Order ****************************")
 
 }
 
