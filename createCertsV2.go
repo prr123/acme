@@ -186,10 +186,10 @@ func main() {
 			log.Printf("received txtrec from Lookup\n")
 			if dbg {
 				fmt.Printf("txtrecs[%d]: %s\n", len(txtrecs), txtrecs[0])
-				fmt.Printf("token:       %s\n", csrList.Domains[i].Token)
+				fmt.Printf("token:       %s\n", csrList.Domains[i].TokVal)
 			}
 			if len(txtrecs[0]) > 0 {noAcmeRec = false}
-			if txtrecs[0] != csrList.Domains[i].Token {
+			if txtrecs[0] != csrList.Domains[i].TokVal {
 				acmeDomList[i].AcmeRec = true
 				oldAcmeRec = true
 			}
@@ -200,8 +200,7 @@ func main() {
 			if idx>-1 {
 				log.Printf("domain: %s -- no acme challenge record!", acmeDomain)
 			} else {
-				log.Printf("domain: %s -- no acme challenge record! %v", acmeDomain, err)
-				log.Fatalf("lookup error: %v", err)
+				log.Fatalf("domain: %s -- lookup: %v", acmeDomain, err)
 			}
 		}
 	}
@@ -228,9 +227,11 @@ func main() {
 	log.Printf("success getting client dir\n")
 	if dbg {certLib.PrintDir(clientDir)}
 
+	lookup:= true
 
 	if allChalRec {
-		goto Lookup
+		log.Printf("found all domains contain acme chal recs; going to lookup!")
+		goto ProcOrder
 	}
 
 	// Authorize all domains provided in the cmd line args.
@@ -314,19 +315,11 @@ func main() {
 	err = certLib.WriteCsrFil(csrFilnam, csrList)
 	if err != nil {log.Fatal("certLib.WriteCsrFil: %v\n", err)}
 
-	os.Exit(1)
+//	os.Exit(1)
 
-Lookup:
-	log.Printf("arrived at Lookup\n")
-
-//	orderUrl := order.URI
-	orderUrl := csrList.OrderUrl
-	if len(orderUrl) == 0 {log.Fatalf("no order Url in CsrListFile!\n")}
-
-	if noAcmeRec {
-	// convert into a function
+	// we need to check whether newly add Dns Records have propagated
 	log.Printf("performing lookup for all challenge records")
-	lookup:= true
+
 	for i:=0; i< numAcmeDom; i++ {
 		domain := authIdList[i].Value
 
@@ -347,7 +340,15 @@ Lookup:
 				break
 			} else {
 				// need to parse err for 127.0.0.53:53
-				log.Printf("Lookup err: %v - sleeping %d\n", err, i+1)
+				errStr := err.Error()
+				log.Printf("*** errStr: %s\n", errStr)
+				idx := strings.Index(errStr, "127.0.0.53:53")
+				if idx>-1 {
+					log.Printf("domain: %s -- no acme challenge record!", acmeDomain)
+				} else {
+					log.Fatalf("domain: %s -- lookup: %v", acmeDomain, err)
+				}
+//				log.Printf("Lookup no acme chal rec found! -- sleeping %d\n", i+1)
 				time.Sleep(10 * time.Second)
 			}
 		}
@@ -364,9 +365,14 @@ Lookup:
 		log.Printf("Could not lookup Acme Chal records for all domains!\n")
 		os.Exit(1)
 	}
-	} // end if
 
+	//  at this point the dns chal records are all propaged. So we can process the challenge
+ProcOrder:
+	log.Printf("arrived at ProcOrd\n")
 
+//	orderUrl := order.URI
+	orderUrl := csrList.OrderUrl
+	if len(orderUrl) == 0 {log.Fatalf("no order Url in CsrListFile!\n")}
 
 	// ready for sending an accept; checked dns propogation with lookup
 	for i:=0; i< numAcmeDom; i++ {
@@ -377,9 +383,7 @@ Lookup:
 			Token: dom.Token,
 			Status: "pending",
 		}
-		certLib.PrintChallenge(&chalVal, dom.Domain)
-
-		continue
+		if dbg {certLib.PrintChallenge(&chalVal, dom.Domain)}
 
 		domain := dom.Domain
 		log.Printf("sending Accept for domain %s\n", domain)
@@ -387,13 +391,11 @@ Lookup:
 //		chalVal := chalList[i]
 
 		chal2, err := client.Accept(ctx, &chalVal)
-		if err != nil {log.Fatalf("dns-01 accept for %q: %v", domain, err)}
+		if err != nil {log.Fatalf("dns-01 chal not accepted for %s: %v", domain, err)}
 		if dbg {certLib.PrintChallenge(chal2, domain)}
- 		log.Printf("Accept acknowledged\n")
+ 		log.Printf("chal accepted for domain %s\n", domain)
 
 	}
-
-	os.Exit(1)
 
 	tmpord, err := client.GetOrder(ctx, orderUrl)
 	if err !=nil {log.Fatalf("order error: %v\n", err)}
@@ -410,7 +412,7 @@ Lookup:
 	}
 	log.Printf("received order!\n")
 
-//		if dbg {certLib.PrintOrder(*ord2)}
+	if dbg {certLib.PrintOrder(*ord2)}
 
 	for i:=0; i< numAcmeDom; i++ {
 
