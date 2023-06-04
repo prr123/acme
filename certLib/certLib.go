@@ -396,7 +396,7 @@ func GenerateCertName(domain string)(certName string, err error) {
 
 	domByt := []byte(domain)
 	suc := false
-	for i:=len(domByt); i> 0; i-- {
+	for i:=len(domByt)-1; i> 0; i-- {
 		if domByt[i] == '.' {
 			domByt[i] = '_'
 			suc = true
@@ -405,6 +405,7 @@ func GenerateCertName(domain string)(certName string, err error) {
 	}
 	if !suc {return "", fmt.Errorf("no extension with TLD found!")}
 
+	certName = string(domByt)
 	return certName, nil
 }
 
@@ -477,7 +478,8 @@ func CreateCsrTpl(csrData CsrDat) (template x509.CertificateRequest) {
 		RawSubject:         asn1Subj,
 //  	EmailAddresses:     []string{emailAddress}, !not allowed for let's encrypt!!
 		SignatureAlgorithm: x509.ECDSAWithSHA256,
-		DNSNames: []string{csrData.Domain},
+		DNSNames: []string{},
+//		DNSNames: []string{csrData.Domain},
 	}
 	return template
 }
@@ -789,4 +791,52 @@ func PrintCert(cert *x509.Certificate) {
 
 	fmt.Println("********** End Certificate ************")
 
+}
+
+func PrintCsrReq(req *x509.CertificateRequest) {
+
+	fmt.Println("******************* CSR ********************")
+	fmt.Printf("DNS Names %d\n", len(req.DNSNames))
+	for i:=0; i< len(req.DNSNames); i++ {
+		fmt.Printf("%d: %s\n", i+1, req.DNSNames[i])
+	}
+	fmt.Printf("URIs      %d\n", len(req.URIs))
+	for i:=0; i< len(req.URIs); i++ {
+		uri := *req.URIs[i]
+		fmt.Printf("%d: %v\n", i+1, uri)
+	}
+	fmt.Printf("Version: %d\n", req.Version)
+	fmt.Printf("Subject:\n")
+	subj := req.Subject
+	fmt.Printf("  Serial Number: %s\n", subj.SerialNumber)
+	fmt.Printf("  CommonName: %s\n", subj.CommonName)
+	fmt.Printf("  Country %d\n", len(subj.Country))
+	for i:=0; i< len(subj.Country); i++ {
+		fmt.Printf("%d: %s\n", i+1, subj.Country[i])
+	}
+	fmt.Printf("  Locality %d\n", len(subj.Locality))
+	for i:=0; i< len(subj.Locality); i++ {
+		fmt.Printf("%d: %s\n", i+1, subj.Locality[i])
+	}
+	fmt.Printf("  Names %d\n", len(subj.Names))
+	for i:=0; i< len(subj.Names); i++ {
+		fmt.Printf("%d: %v\n", i+1, subj.Names[i])
+	}
+	fmt.Printf("  ExtraNames %d\n", len(subj.ExtraNames))
+	for i:=0; i< len(subj.ExtraNames); i++ {
+	    fmt.Printf("Subject:\n")
+		fmt.Printf("%d: %v\n", i+1, subj.ExtraNames[i])
+	}
+    fmt.Printf("Extensions: %d\n", len(req.Extensions))
+    for i:=0; i< len(req.Extensions); i++ {
+		ext := req.Extensions[i]
+        fmt.Printf("%d: %v %t %s %d\n", i+1, ext.Id, ext.Critical, string(ext.Value), len(ext.Value))
+    }
+    fmt.Printf("ExtraExtensions: %d\n", len(req.ExtraExtensions))
+    for i:=0; i< len(req.ExtraExtensions); i++ {
+		ext := req.ExtraExtensions[i]
+        fmt.Printf("%d: %v\n", i+1, ext)
+    }
+
+	fmt.Println("****************** End CSR ******************")
 }
