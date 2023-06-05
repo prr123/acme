@@ -833,19 +833,103 @@ func PrintCert(cert *x509.Certificate) {
 
 	fmt.Printf("Version: %d\n", cert.Version)
 	fmt.Printf("Serial:  %d\n", cert.SerialNumber)
+	fmt.Printf("Sig Algo:    %s\n", cert.SignatureAlgorithm.String())
+	fmt.Printf("PubKey Algo: %s\n", cert.PublicKeyAlgorithm.String())
 	fmt.Printf("Issuer: \n")
 	namIssuer := cert.Issuer
 	fmt.Printf("  Countries: %d\n", len(namIssuer.Country))
 	if len(namIssuer.Country)>0 {
 		fmt.Printf("    Country: %s\n", namIssuer.Country[0])
 	}
+	fmt.Printf("Issuer: \n")
+	PrintPkixNam(cert.Issuer)
+
 	fmt.Printf("Subject: \n")
+	PrintPkixNam(cert.Subject)
 
 	fmt.Printf("Start: %s\n", cert.NotBefore.Format(time.RFC1123))
 	fmt.Printf("End:   %s\n", cert.NotAfter.Format(time.RFC1123))
 
+	fmt.Printf("DNS Names: %d\n", len(cert.DNSNames))
+	for i:=0; i< len(cert.DNSNames); i++ {
+		fmt.Printf("    %d:%s\n", i+1, cert.DNSNames[i])
+	}
+	fmt.Printf("IP Adrs: %d\n", len(cert.IPAddresses))
+	for i:=0; i< len(cert.IPAddresses); i++ {
+		fmt.Printf("    %d:%s\n", i+1, cert.IPAddresses[i])
+	}
+
 	fmt.Println("********** End Certificate ************")
 
+}
+
+func PrintPkixNam(subj pkix.Name) {
+    fmt.Printf("  Serial Number: %s\n", subj.SerialNumber)
+    fmt.Printf("  CommonName: %s\n", subj.CommonName)
+
+	if len(subj.Country) ==1 {
+    	fmt.Printf("  Country %s\n", subj.Country[0])
+	} else {
+	    fmt.Printf("  Country %d\n", len(subj.Country))
+	    for i:=0; i< len(subj.Country); i++ {
+    	    fmt.Printf("%d: %s\n", i+1, subj.Country[i])
+    	}
+	}
+	if len(subj.Organization) ==1 {
+		fmt.Printf("  Organization: %s\n",subj.Organization[0])
+	} else {
+		fmt.Printf("  Organization %d\n", len(subj.Organization))
+    	for i:=0; i< len(subj.Organization); i++ {
+        	fmt.Printf("%d: %s\n", i+1, subj.Organization[i])
+    	}
+	}
+
+	if len(subj.Locality) == 1 {
+	    fmt.Printf("  Locality %s\n", subj.Locality[0])
+	} else {
+    	fmt.Printf("  Locality %d\n", len(subj.Locality))
+    	for i:=0; i< len(subj.Locality); i++ {
+        	fmt.Printf("%d: %s\n", i+1, subj.Locality[i])
+    	}
+	}
+
+	if len(subj.Province) == 1 {
+	    fmt.Printf("  Province %s\n", subj.Province[0])
+	} else {
+    	fmt.Printf("  Province %d\n", len(subj.Province))
+    	for i:=0; i< len(subj.Province); i++ {
+        	fmt.Printf("%d: %s\n", i+1, subj.Province[i])
+    	}
+	}
+
+	if len(subj.StreetAddress) == 1 {
+	    fmt.Printf("  StreetAddress %s\n", subj.StreetAddress[0])
+	} else {
+    	fmt.Printf("  StreetAddress %d\n", len(subj.StreetAddress))
+    	for i:=0; i< len(subj.StreetAddress); i++ {
+        	fmt.Printf("%d: %s\n", i+1, subj.StreetAddress[i])
+    	}
+	}
+
+	if len(subj.PostalCode) == 1 {
+	    fmt.Printf("  PostalCode %s\n", subj.PostalCode[0])
+	} else {
+    	fmt.Printf("  PostalCode %d\n", len(subj.PostalCode))
+    	for i:=0; i< len(subj.PostalCode); i++ {
+        	fmt.Printf("%d: %s\n", i+1, subj.PostalCode[i])
+    	}
+	}
+
+
+    fmt.Printf("  Names %d\n", len(subj.Names))
+    for i:=0; i< len(subj.Names); i++ {
+        fmt.Printf("%d: %v\n", i+1, subj.Names[i])
+    }
+    fmt.Printf("  ExtraNames %d\n", len(subj.ExtraNames))
+    for i:=0; i< len(subj.ExtraNames); i++ {
+        fmt.Printf("Subject:\n")
+        fmt.Printf("%d: %v\n", i+1, subj.ExtraNames[i])
+    }
 }
 
 func PrintCsrReq(req *x509.CertificateRequest) {
