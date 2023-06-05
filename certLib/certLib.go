@@ -27,18 +27,6 @@ import (
     yaml "github.com/goccy/go-yaml"
 )
 
-/*
-type ChalList struct {
-	Date time.Time `yaml:"Date"`
-	ChalObjs []ChalObj `yaml:"ChalObjects"`
-}
-
-type ChalObj struct {
-	Domain string `yaml:"Domain"`
-	Type string `yaml:"Type"`
-}
-*/
-
 type LEObj struct {
 	Client *acme.Client
 	Acnt *acme.Account
@@ -484,6 +472,47 @@ func CreateCsrTpl(csrData CsrDat) (template x509.CertificateRequest) {
 	return template
 }
 
+//xxx
+// create certficate sign request
+func CreateCsrTplNew(csrList *CsrList, domIdx int) (template x509.CertificateRequest, err error) {
+
+	numAcmeDom := len((*csrList).Domains)
+	if numAcmeDom == 0 {return template, fmt.Errorf("no Acme Domains")}
+	if domIdx > numAcmeDom-1 {return template, fmt.Errorf("domIdx > numAcmeDom")}
+
+	nam := (*csrList).Domains[0].Name
+	subj := pkix.Name{
+		CommonName:         nam.CommonName,
+		Country:            []string{nam.Country},
+		Province:           []string{nam.Province},
+		Locality:           []string{nam.Locality},
+		Organization:       []string{nam.Organisation},
+		OrganizationalUnit: []string{"Admin"},
+	}
+
+	rawSubj := subj.ToRDNSequence()
+
+	asn1Subj, _ := asn1.Marshal(rawSubj)
+	template = x509.CertificateRequest{
+		RawSubject:         asn1Subj,
+//  	EmailAddresses:     []string{emailAddress}, !not allowed for let's encrypt!!
+		SignatureAlgorithm: x509.ECDSAWithSHA256,
+	}
+
+	if domIdx < 0 {
+		dnsNam := make([]string, numAcmeDom)
+		for i:=0; i<numAcmeDom; i++ {
+			dnsNam[i] = (*csrList).Domains[i].Domain
+		}
+		template.DNSNames = dnsNam
+		return template, nil
+	}
+	dnsNam := make([]string, 1)
+	dnsNam[0] = csrList.Domains[domIdx].Domain
+	template.DNSNames = dnsNam
+	return template, nil
+}
+
 func EncodeKey(privateKey *ecdsa.PrivateKey, publicKey *ecdsa.PublicKey) (string, string) {
     x509Encoded, _ := x509.MarshalECPrivateKey(privateKey)
     pemEncoded := pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: x509Encoded})
@@ -595,6 +624,32 @@ func GetAcmeClient() (cl *acme.Client, err error) {
 
 	client.Key = privateKey
     return &client, nil
+}
+
+func CleanCsrFil (csrFilnam string, csrList *CsrList) (err error) {
+
+    log.Printf("cleaning csr file\n")
+
+    numAcmeDom := len(csrList.Domains)
+
+    for i:= 0; i< numAcmeDom; i++ {
+        domain := csrList.Domains[i]
+        domain.ChalRecId = ""
+        domain.Token = ""
+        domain.TokVal = ""
+        domain.TokUrl = ""
+        domain.TokIssue = time.Time{}
+        domain.TokExp = time.Time{}
+        csrList.Domains[i] = domain
+    }
+
+    csrList.LastLU = time.Now()
+    err = WriteCsrFil(csrFilnam, csrList)
+    if err != nil { return fmt.Errorf("certLib.WriteCsrFil: %v\n", err)}
+
+    log.Printf("success writing Csr File\n")
+
+    return nil
 }
 
 
