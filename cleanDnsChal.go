@@ -16,7 +16,7 @@ import (
 	"fmt"
 	"os"
 	"net"
-	"time"
+//	"time"
 	"strings"
 
 //    yaml "github.com/goccy/go-yaml"
@@ -95,28 +95,33 @@ func main() {
 	// see whether acme domains are in zoneList
 
 	count:=0
-	for j:= 0; j< numAcmeDom; j++ {
-		acmeDom := csrList.Domains[j].Domain
-		for i:=0; i< numZones; i++ {
-			if zoneList.Zones[i].Name == acmeDom {
-				acmeDomList[j].Name = acmeDom
-				acmeDomList[j].Id = zoneList.Zones[i].Id
+	for i:= 0; i< numAcmeDom; i++ {
+		acmeDomNam := csrList.Domains[i].Domain
+		for j:=0; j< numZones; j++ {
+			if acmeDomNam == zoneList.Zones[j].Name {
+				acmeDomList[i].Name = acmeDomNam
+				acmeDomList[i].Id = zoneList.Zones[j].Id
 				count++
 				break
 			}
 		}
 	}
 
-	if count == 0 {log.Fatalf("no matching acme domains found in cf list")}
+	if count == 0 {log.Fatalf("no matching acme domains found in cf list!\n")}
+	if count == numAcmeDom {
+		log.Printf("all csr domains found in cd list!\n")
+	} else {
+		log.Printf("only %d out %d csr domains found in cd list!\n", count, numAcmeDom)
+	}
 
 	numAcmeDom = count
 //    log.Printf("matched %d acme Domains\n", numAcmeDom)
 
-
+	fmt.Println("*************************************")
 	for j:= 0; j< numAcmeDom; j++ {
-		log.Printf("acme domain [%d]: %-20s id: %s\n", j+1, acmeDomList[j].Name, acmeDomList[j].Id)
+		log.Printf("domain[%d]: %-20s id: %s\n", j+1, acmeDomList[j].Name, acmeDomList[j].Id)
 	}
-
+	fmt.Println("*************************************")
 
 	// test acme domains for challenge records
 	foundAcme := 0
@@ -134,15 +139,25 @@ func main() {
 			acmeDomList[i].AcmeRec = true
 			foundAcme++
 		} else {
-			log.Printf("domain: %s -- no acme challenge record found!\n", domain)
+			errStr := err.Error()
+			idx := strings.Index(errStr, "127.0.0.53:53")
+			if idx == -1 {
+				log.Printf("domain %s: lookup error:%v\n", domain, err)
+			} else {
+				log.Printf("domain: %s -- no acme challenge record found!\n", domain)
+			}
 		}
 	}
 
 	if foundAcme == 0 {
 		log.Printf("no residual Dns Challenge Records found!\n")
+		err = certLib.CleanCsrFil(csrFilnam, csrList)
+		if err != nil {log.Fatalf("cleanCsrFil: %v\n", err)}
+		log.Printf("success clean-up acme Dns records!\n")
 		os.Exit(1)
 	}
 
+	// clean-up Dns records
 	log.Printf("found %d Domains with residual DNS Challenge records!\n", foundAcme)
 
 	// get api for DNS use default yaml file
@@ -176,17 +191,8 @@ func main() {
 	}
 
 	log.Printf("finished cleaning acme dns records\n")
-
-	log.Printf("cleaning csr file\n")
-
-	for i:= 0; i< numAcmeDom; i++ {
-		domain := csrList.Domains[i]
-		if len(domain.Token) > 0 {domain.Token = ""}
-		if !domain.TokExp.IsZero() {domain.TokExp = time.Time{}}
-	}
-
-	csrList.LastLU = time.Now()
-	err = certLib.WriteCsrFil(csrFilnam, csrList)
-	if err != nil {log.Fatalf("certLib.WriteCsrFil: %v\n", err)}
-	log.Printf("success writing Csr File\n")
+	err = certLib.CleanCsrFil(csrFilnam, csrList)
+	if err != nil {log.Fatalf("cleanCsrFil: %v\n", err)}
+	log.Printf("success clean-up acme Dns records!\n")
 }
+
