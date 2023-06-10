@@ -1,4 +1,4 @@
-// getAcnt.go
+// checkAcnt.go
 // program that generates Lets encrypt Account and saves keys
 // author: prr azul software
 // date: 8 May 2023
@@ -42,21 +42,16 @@ func main() {
 		}
 	}
 
-	certDir, err := certLib.GetCertDir()
-	if err !=nil {log.Fatalf("GetCertDir: %v", err)}
-	log.Printf("Using certDir: %s\n", certDir)
 
 	// creating context
 	ctx := context.Background()
 
-	privfilNam := certDir + "LE_priv.key"
-	pubfilNam := certDir + "LE_pub.key"
-
-	client, err := certLib.GetAcmeClient(privfilNam, pubfilNam)
-	if err != nil {log.Fatalf("certLib.GetLEAcnt: %v\n", err)}
+	client, err := certLib.GetAcmeClient()
+	if err != nil {log.Fatalf("certLib.GetAcmeClient: %v\n", err)}
 
 	acnt, err := client.GetReg(ctx, "")
 	if err != nil {log.Fatalf("newClient: %v\n", err)}
+	log.Printf("Retrieved Acnt!\n")
 
 	if dbg {certLib.PrintClient(client)}
 
