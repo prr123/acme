@@ -148,7 +148,7 @@ func GetCertDir(envVar string)(certDir string, err error) {
 	return certDir, nil
 }
 
-func GenCertKey()(certKey *edcsa.PrivateKey,err error) {
+func GenCertKey()(certKey *ecdsa.PrivateKey,err error) {
 
     certKey, err = ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
     if err != nil {
