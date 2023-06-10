@@ -3,15 +3,20 @@ folder contains acme test program(s) to test implementations of crypto/acme with
 
 ## programs
 
-### RdCsrList
+### readCsrList
 program that reads a CsrList yaml file
 
 usage: ./RdCsrList csrList.yaml
+
+### checkChal
+program reads csrList File to check whether each domain has a DNS challenge record
 
 ### createCerts
 program that creates ssl Certs
 
 usage: ./createCerts csrList.yaml
+
+### createCerts
 
 #### Flow
 
@@ -19,7 +24,7 @@ usage: ./createCerts csrList.yaml
 2. read list of domains (zones) managed under cloudflare
 3. create list of domains for certs
 4. establish account with Lets Encrypt
-5. from LE get authorisation order for the domain target list (step 3) for DNS challenge
+5. from Let's Encrypt (LE) get authorisation order for the domain target list (step 3) for DNS challenge
 6. for each domain:
    1. get authorization url
    2. get token
@@ -38,6 +43,7 @@ usage: ./createCerts csrList.yaml
 library that contains utility functions
 
 ### ReadCsrFil
+function that reads the CSR file and returns a csrlist
 
 ### NewClient
 generates a new acme client 
