@@ -81,16 +81,6 @@ func main() {
 	var oidEmailAddress = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 9, 1}
 
 	emailAddress := CsrData.Email
-/*
-	subj := pkix.Name{
-		CommonName:         "example.com",
-		Country:            []string{"AU"},
-		Province:           []string{"Some-State"},
-		Locality:           []string{"MyCity"},
-		Organization:       []string{"Company Ltd"},
-		OrganizationalUnit: []string{"IT"},
-	}
-*/
 
 	nam := CsrData.Name
 	subj := pkix.Name{
