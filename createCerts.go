@@ -112,11 +112,34 @@ func main() {
 	}
 
 	if count == 0 {log.Fatalf("no matching acme domains found in cf list")}
+
 	numAcmeDom = count
     log.Printf("matched %d acme Domains\n", numAcmeDom)
 
+
 	for j:= 0; j< numAcmeDom; j++ {
 		log.Printf("acme domain [%d]: %20s id: %s\n", j+1, acmeDomList[j].Name, acmeDomList[j].Id)
+	}
+
+
+	// test acme domains for challenge records
+	foundAcme := false
+	for i:=0; i< numAcmeDom; i++ {
+		acmeDomList[i].AcmeRec = false
+		domain := acmeDomList[i].Name
+		acmeDomain := "_acme-challenge." + domain
+
+		log.Printf("performing ns.Lookup %s for DNS Challenge Record!\n", acmeDomain)
+
+		txtrecs, err := net.LookupTXT(acmeDomain)
+		if err == nil {
+			log.Printf("received txtrec from Lookup\n")
+			if dbg {fmt.Printf("txtrecs [%d]: %s\n", len(txtrecs), txtrecs[0])}
+			acmeDomList[i].AcmeRec = true
+			foundAcme = true
+		} else {
+			log.Printf("domain: %s -- no acme challenge record! %v", err)
+		}
 	}
 
 	// get api for DNS use default yaml file
@@ -127,70 +150,73 @@ func main() {
 	// creating context
 	ctx := context.Background()
 
+	if foundAcme {
 	// check acme target domains for left-over acme records
-	log.Printf("checking for left-over acme records\n")
-	var listDns cloudflare.ListDNSRecordsParams
-	var rc cloudflare.ResourceContainer
-	rc.Level = cloudflare.ZoneRouteLevel
+		log.Printf("checking for left-over acme records\n")
+		var listDns cloudflare.ListDNSRecordsParams
+		var rc cloudflare.ResourceContainer
+		rc.Level = cloudflare.ZoneRouteLevel
 
-	cf := cfapi.API
+		cf := cfapi.API
 
-	for i:=0; i< numAcmeDom; i++ {
-		domain := acmeDomList[i].Name
-		log.Printf("cleaning domain[%d]: %s\n", i+1, domain)
-        rc.Identifier = acmeDomList[i].Id
+		for i:=0; i< numAcmeDom; i++ {
+			if !acmeDomList[i].AcmeRec {continue}
+			domain := acmeDomList[i].Name
+			log.Printf("cleaning domain[%d]: %s\n", i+1, domain)
+			rc.Identifier = acmeDomList[i].Id
 
-        dnsRecs, _, err := cf.ListDNSRecords(ctx, &rc, listDns)
-        if err != nil {
-            log.Fatalf("domain[%d]: %s api.ListDNSRecords: %v\n", i+1, domain, err)
-        }
+    	    dnsRecs, _, err := cf.ListDNSRecords(ctx, &rc, listDns)
+			if err != nil {log.Fatalf("domain[%d]: %s api.ListDNSRecords: %v\n", i+1, domain, err)}
 
-		if dbg {cfLib.PrintDnsRecs(&dnsRecs)}
-        dnsId := ""
-        for j:=0; j< len(dnsRecs); j++ {
-            idx := strings.Index(dnsRecs[j].Name, "_acme-challenge.")
-            if idx == 0 {
-                dnsId = dnsRecs[j].ID
-				log.Printf("found acme challenge record[%d] in domain %s\n", j+1, domain)
-				err = cf.DeleteDNSRecord(ctx, &rc, dnsId)
-				if err != nil {log.Fatalf("api.DeleteDNSRecord: %v\n", err)}
-				log.Println("deleted Acme Dns Record")
+			if dbg {cfLib.PrintDnsRecs(&dnsRecs)}
+    	    dnsId := ""
+        	for j:=0; j< len(dnsRecs); j++ {
+            	idx := strings.Index(dnsRecs[j].Name, "_acme-challenge.")
+            	if idx == 0 {
+                	dnsId = dnsRecs[j].ID
+					log.Printf("found acme challenge record[%d] in domain %s\n", j+1, domain)
+					err = cf.DeleteDNSRecord(ctx, &rc, dnsId)
+					if err != nil {log.Fatalf("api.DeleteDNSRecord: %v\n", err)}
+					log.Println("deleted Acme Dns Record")
+				}
 			}
 		}
-	}
 
-	log.Printf("finished cleaning acme records\n")
-	if dbg {
-		for i:=0; i< numAcmeDom; i++ {
-			domain := acmeDomList[i].Name
-			log.Printf("testing domain[%d]: %s\n", i+1, domain)
-        	rc.Identifier = acmeDomList[i].Id
-	        dnsRecs, _, err := cf.ListDNSRecords(ctx, &rc, listDns)
-    	    if err != nil {log.Fatalf("domain[%d]: %s api.ListDNSRecords: %v\n", i+1, domain, err)}
-			cfLib.PrintDnsRecs(&dnsRecs)
+		log.Printf("finished cleaning acme records\n")
+
+		if dbg {
+			for i:=0; i< numAcmeDom; i++ {
+				domain := acmeDomList[i].Name
+				log.Printf("testing domain[%d]: %s\n", i+1, domain)
+        		rc.Identifier = acmeDomList[i].Id
+	        	dnsRecs, _, err := cf.ListDNSRecords(ctx, &rc, listDns)
+    	    	if err != nil {log.Fatalf("domain[%d]: %s api.ListDNSRecords: %v\n", i+1, domain, err)}
+				cfLib.PrintDnsRecs(&dnsRecs)
+			}
 		}
-	}
 
-	// need to test cleanup with lookup
-	for i:=0; i< numAcmeDom; i++ {
-		domain := acmeDomList[i].Name
-
-		acmeDomain := "_acme-challenge." + domain
-
+		// need to test cleanup with lookup
 		log.Printf("waiting 2 sec before performing ns.Lookup\n")
 		time.Sleep(2 * time.Second)
-		log.Printf("performing ns.Lookup %s for DNS Challenge Record!\n", acmeDomain)
 
-		txtrecs, err := net.LookupTXT(acmeDomain)
-		if err != nil {
-			log.Printf("domain: %s -- no acme challenge record! %v", err)
-		} else {
-			log.Printf("received txtrec from Lookup\n")
-			if dbg {fmt.Printf("txtrecs [%d]: %s\n", len(txtrecs), txtrecs[0])}
-			log.Fatalf("ending!")
+		for i:=0; i< numAcmeDom; i++ {
+			domain := acmeDomList[i].Name
+
+			acmeDomain := "_acme-challenge." + domain
+			log.Printf("performing ns.Lookup %s for DNS Challenge Record!\n", acmeDomain)
+
+			txtrecs, err := net.LookupTXT(acmeDomain)
+			if err != nil {
+				log.Printf("domain: %s -- no acme challenge record! %v", err)
+			} else {
+				log.Printf("received txtrec from Lookup\n")
+				if dbg {fmt.Printf("txtrecs [%d]: %s\n", len(txtrecs), txtrecs[0])}
+			}
 		}
+		os.Exit(1)
 	}
 
+	log.Printf("Tested success: No old Acme Challenge Records found!")
 	// create new acme client
 	client, err := certLib.NewClient(ctx, dbg)
 	if err != nil {log.Fatalf("newClient: %v\n", err)}
