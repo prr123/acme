@@ -121,4 +121,3 @@ func main() {
 	if !foundAcme {log.Fatalf("some domains do not have acme challenge records!")}
 	log.Printf("success: every domain has a acme challenge record!")
 }
-
