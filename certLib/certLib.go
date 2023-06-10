@@ -523,6 +523,15 @@ func CreateCsrTplNew(csrList *CsrList, domIdx int) (template x509.CertificateReq
 	return template, nil
 }
 
+func CreateCsr(csrTpl x509.CertificateRequest, certKey *ecdsa.PrivateKey)(csr []byte,err error) {
+
+    csr, err = x509.CreateCertificateRequest(rand.Reader, &csrTpl, certKey)
+    if err != nil { return csr, fmt.Errorf("CreateCertReq: %v",err)}
+
+	return csr, nil
+}
+
+
 func EncodeKey(privateKey *ecdsa.PrivateKey, publicKey *ecdsa.PublicKey) (string, string) {
     x509Encoded, _ := x509.MarshalECPrivateKey(privateKey)
     pemEncoded := pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: x509Encoded})
