@@ -1,11 +1,11 @@
-// createCertsV2.go
+// createCertsV3.go
 // program that generates certificates from Lets encrypt using the DNS Challenge
 // author: prr azul software
-// date: 31 March 2023
+// date: 5 June 2023
 // copyright 2023 prr, azulsoftware
 //
-// code copied to test
-// may include some modifications made by the author to the original code
+// code copied from V2
+// single order for multiple domains
 //
 
 package main
@@ -123,8 +123,6 @@ func main() {
 
 	acmeDomList := make([]cfLib.ZoneAcme, numAcmeDom)
 	// see whether acme domains are in zoneList
-
-	chalList := make([]acme.Challenge, numAcmeDom)
 
 	// get api for DNS use default yaml file
 
@@ -277,8 +275,6 @@ func main() {
 
 		if chal == nil {log.Fatalf("dns-01 challenge is not available for zone %s", domain)}
 
-		chalList[i] = *chal
-
 		log.Printf("success obtaining challenge\n")
 		if dbg {certLib.PrintChallenge(chal, acmeZone.Name)}
 
@@ -388,11 +384,9 @@ ProcOrder:
 		domain := dom.Domain
 		log.Printf("sending Accept for domain %s\n", domain)
 
-//		chalVal := chalList[i]
-
-		chal2, err := client.Accept(ctx, &chalVal)
+		chal, err := client.Accept(ctx, &chalVal)
 		if err != nil {log.Fatalf("dns-01 chal not accepted for %s: %v", domain, err)}
-		if dbg {certLib.PrintChallenge(chal2, domain)}
+		if dbg {certLib.PrintChallenge(chal, domain)}
  		log.Printf("chal accepted for domain %s\n", domain)
 
 	}
@@ -437,15 +431,16 @@ ProcOrder:
 	err = certLib.SaveKeyPem(certKey, keyFilnam)
 	if err != nil {log.Fatalf("certLib.SaveKeypem: %v",err)}
 
-	template := certLib.CreateCsrTpl(csrList)
-	csr, err := x509.CreateCertificateRequest(rand.Reader, &template, certKey)
+	csrTpl, err := certLib.CreateCsrTplNew(csrList, -1)
+	if err != nil {	log.Fatalf("CreateCsrTpl: %v",err)}
+
+	csr, err := x509.CreateCertificateRequest(rand.Reader, &csrTpl, certKey)
 	if err != nil {	log.Fatalf("CreateCertReq: %v",err)}
 
 	csrParseReq, err := x509.ParseCertificateRequest(csr)
-//		_, err := x509.ParseCertificateRequest(csr)
 	if err != nil {log.Fatalf("Error parsing certificate request: %v", err)}
 
-		// need to compare csrParse and template
+	// need to compare csrParse and template
 	certLib.PrintCsrReq(csrParseReq)
 
 	FinalUrl := ord2.FinalizeURL
@@ -464,14 +459,16 @@ ProcOrder:
 
 	// cleanup
 	for i:=0; i< numAcmeDom; i++ {
-
 		acmeZone := acmeDomList[i]
+		acmeZone.AcmeId = csrList.Domains[i].ChalRecId
 
 		err = cfApiObj.DelDnsChalRecord(acmeZone)
     	if err != nil {log.Fatalf("DelDnsChalRecord: %v\n",err)}
 		log.Printf("deleted DNS Chal Record for zone: %s\n", acmeZone.Name)
 	}
 
+	err = certLib.CleanCsrFil(csrFilnam, csrList)
+	if err != nil {log.Fatalf("CleanCsrFil: %v\n",err)}
 
 	log.Printf("success creating Certs\n")
 }
