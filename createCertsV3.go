@@ -12,9 +12,9 @@ package main
 
 import (
 	"context"
-    "crypto/ecdsa"
-    "crypto/elliptic"
-    "crypto/rand"
+//    "crypto/ecdsa"
+//    "crypto/elliptic"
+//    "crypto/rand"
     "crypto/x509"
 
 	"log"
@@ -24,12 +24,11 @@ import (
 	"net"
 	"strings"
 
-//    yaml "github.com/goccy/go-yaml"
 	"golang.org/x/crypto/acme"
-//	"github.com/cloudflare/cloudflare-go"
 
     cfLib "acme/acmeDns/cfLib"
 	certLib "acme/acmeDns/certLib"
+    util "github.com/prr123/utility/utilLib"
 )
 
 
@@ -41,30 +40,31 @@ func main() {
 
 	numarg := len(os.Args)
 	dbg := true
+    flags:=[]string{"dbg","csr"}
 
-	log.Printf("debug: %t\n", dbg)
-
-	useStr := "./createCerts"
+	useStr := "./createCertsV3 [/csr=] [/dbg]"
 	helpStr := "program that creates certs for all domains listed in the file csrList.yaml\n"
 	helpStr += "requirements: - a file listing all cloudflare domains/zones controlled by this account\n"
 	helpStr += "              - a cloudflare authorisation file with a token that permits DNS record changes in the direcory cloudflare/token\n"
+	helpStr += "              - a csr yaml file located in $LEAcnt/csrList\n"
 
 	zoneDir := os.Getenv("zoneDir")
 	if len(zoneDir) == 0 {log.Fatalf("could not resolve env var zoneDir!")}
 
 	certDir := os.Getenv("certDir")
 	if len(certDir) == 0 {log.Fatalf("could not resolve env var certDir!")}
-
     zoneFilnam := zoneDir + "/cfDomainsShort.yaml"
 
-	csrFilnam := "csrList.yaml"
+	leAcnt := os.Getenv("LEAcnt")
+	if len(leAcnt) < 1 {log.Fatalf("could not resolve env var LEAcnt!")}
+
+	csrFilnam := leAcnt + "csrList/csrTest.yaml"
 
     cfDir := os.Getenv("Cloudflare")
 	if len(cfDir) == 0 {log.Fatalf("could not resolve env var cfDir!")}
-
     cfApiFilnam := cfDir + "/token/cfDns.yaml"
 
-	if numarg > 2 {
+	if numarg > 4 {
 		fmt.Println("too many arguments in cl!")
 		fmt.Println("usage: %s\n", useStr)
 		os.Exit(-1)
@@ -76,16 +76,36 @@ func main() {
 		os.Exit(-1)
 	}
 
-	if numarg == 2 {
+	if numarg > 1 {
 		if os.Args[1] == "help" {
 			fmt.Printf("help: ")
 			fmt.Printf("usage is: %s\n", useStr)
 			fmt.Printf("\n%s\n", helpStr)
 			os.Exit(1)
 		}
-		csrFilnam = os.Args[1]
+        flagMap, err := util.ParseFlags(os.Args, flags)
+        if err != nil {log.Fatalf("util.ParseFlags: %v\n", err)}
+
+        if dbg {
+            for k, v :=range flagMap {
+                fmt.Printf("k: %s v: %s\n", k, v)
+            }
+        }
+        _, ok := flagMap["dbg"]
+        if ok {dbg = true}
+
+        val, ok := flagMap["csr"]
+        if !ok {
+            log.Printf("default csrList: %s\n", csrFilnam)
+        } else {
+            if val.(string) == "none" {log.Fatalf("no yaml file provided with /csr  flag!")}
+            csrFilnam = leAcnt + "/csrList/" + val.(string)
+            log.Printf("using csrList: %s\n", csrFilnam)
+        }
 	}
 
+
+	log.Printf("debug: %t\n", dbg)
 	log.Printf("Using zone file: %s\n", zoneFilnam)
 	log.Printf("Using csr file: %s\n", csrFilnam)
 
@@ -422,19 +442,24 @@ ProcOrder:
 	certFilnam := certDir + "/" + certNam + ".crt"
 	log.Printf("key file: %s cert file: %s\n", keyFilnam, certFilnam)
 
-	certKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+//	certKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	certKey, err := certLib.GenCertKey()
 	if err != nil {
-		log.Fatalf("GenerateKey: %v\n",err)
+		log.Fatalf("GenCertKey: %v\n",err)
 	}
 	log.Printf("Cert Request: key generated!\n")
 
 	err = certLib.SaveKeyPem(certKey, keyFilnam)
 	if err != nil {log.Fatalf("certLib.SaveKeypem: %v",err)}
+	log.Printf("Save: key saved as PEM!\n")
 
 	csrTpl, err := certLib.CreateCsrTplNew(csrList, -1)
 	if err != nil {	log.Fatalf("CreateCsrTpl: %v",err)}
 
-	csr, err := x509.CreateCertificateRequest(rand.Reader, &csrTpl, certKey)
+//	csr, err := x509.CreateCertificateRequest(rand.Reader, &csrTpl, certKey)
+//	if err != nil {	log.Fatalf("CreateCertReq: %v",err)}
+
+	csr, err := certLib.CreateCsr(csrTpl, certKey)
 	if err != nil {	log.Fatalf("CreateCertReq: %v",err)}
 
 	csrParseReq, err := x509.ParseCertificateRequest(csr)
