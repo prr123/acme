@@ -148,6 +148,16 @@ func GetCertDir(envVar string)(certDir string, err error) {
 	return certDir, nil
 }
 
+func GenCertKey()(certKey *edcsa.PrivateKey,err error) {
+
+    certKey, err = ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+    if err != nil {
+        return nil, fmt.Errorf("ecdsa.GenerateKey: %v\n",err)
+    }
+
+	return certKey, nil
+}
+
 
 // functions that reads CSRList from a file
 func ReadCsrFil(inFilNam string)(csrDatList *CsrList, err error) {
