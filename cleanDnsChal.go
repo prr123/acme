@@ -19,52 +19,63 @@ import (
 //	"time"
 	"strings"
 
-//    yaml "github.com/goccy/go-yaml"
-//	"golang.org/x/crypto/acme"
-//	"github.com/cloudflare/cloudflare-go"
-
     cfLib "acme/acmeDns/cfLib"
 	certLib "acme/acmeDns/certLib"
+    util "github.com/prr123/utility/utilLib"
 )
 
 
 func main() {
 
 	numarg := len(os.Args)
-	dbg := true
+    dbg := true
+    flags:=[]string{"dbg","csr"}
 
-	log.Printf("debug: %t\n", dbg)
+	useStr := "cleanSnsChal [/csr=csrfile] [/dbg]"
+	helpStr := "help:\nprogram that cleans up the csr file\n"
 
-	useStr := "cleanSnsChal [domainfile]"
-
-	zoneDir := os.Getenv("zoneDir")
-	if len(zoneDir) < 1 {log.Fatalf("env Var zoneDir not found!\n")}
-	log.Printf("found zoneDir: %s\n", zoneDir)
-    zoneFilnam := zoneDir + "/cfDomainsShort.yaml"
-
-	csrFilnam := "csrList.yaml"
-
-	cfDir := os.Getenv("Cloudflare")
-	if len(cfDir) < 1 {log.Fatalf("env Var Cloudflare not found!\n")}
-	log.Printf("found Cloudflare: %s\n", cfDir)
-    cfApiFilnam := cfDir + "/token/cfDns.yaml"
-
-
-
-	if numarg > 2 {
+	csrFilnam := "csrTest.yaml"
+	if numarg > 3 {
 		fmt.Println(useStr)
 		fmt.Println("too many arguments in cl!")
 		os.Exit(-1)
 	}
 
-	if numarg == 2 {
-		if os.Args[1] == "help" {
-			fmt.Println(useStr)
-			os.Exit(1)
-		}
-		csrFilnam = os.Args[1]
-	}
+    if numarg > 1 {
+        if os.Args[1] == "help" {
+            fmt.Printf("help:\n%s\n", helpStr)
+            fmt.Printf("\nusage is: %s\n", useStr)
+            os.Exit(1)
+        }
+        flagMap, err := util.ParseFlags(os.Args, flags)
+        if err != nil {log.Fatalf("util.ParseFlags: %v\n", err)}
 
+        _, ok := flagMap["dbg"]
+        if ok {dbg = true}
+        if dbg {
+            for k, v :=range flagMap {
+                fmt.Printf("k: %s v: %s\n", k, v)
+            }
+        }
+        val, ok := flagMap["csr"]
+        if !ok {
+            log.Printf("default csrList: %s\n", csrFilnam)
+        } else {
+            if val.(string) == "none" {log.Fatalf("no yaml file provided with /csr  flag!")}
+            csrFilnam = val.(string)
+            log.Printf("using csrList: %s\n", csrFilnam)
+        }
+    }
+
+	certObj, err := certLib.InitCertLib()
+    if err != nil {log.Fatalf("InitCertLib: %v\n", certObj)}
+    if dbg {certLib.PrintCertObj(certObj)}
+
+    csrFilnam = certObj.LeDir + "/csrList/" + csrFilnam
+	zoneFilnam:= certObj.ZoneDir + "/cfDomainsShort.yaml"
+	cfApiFilnam := certObj.CfApiFilnam
+
+	log.Printf("debug: %t\n", dbg)
 	log.Printf("Using zone file: %s\n", zoneFilnam)
 	log.Printf("Using csr file: %s\n", csrFilnam)
 
