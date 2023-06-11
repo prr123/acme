@@ -55,6 +55,7 @@ type CsrDat struct {
 	TokUrl string `yaml:"tokUrl"`
 	TokIssue time.Time `yaml:"issue"`
 	TokExp time.Time `yaml:"expire"`
+	OrderUrl string `yaml:"orderUrl"`
     Name pkixName `yaml:"Name"`
 }
 
@@ -66,6 +67,17 @@ type pkixName struct {
     Organisation string `yaml:"Organisation"`
     OrganisationUnit string `yaml:"OrganisationUnit"`
 }
+
+type certLibObj struct {
+	ZoneDir string
+	CertDir string
+	LeDir string
+	CfDir string
+	CsrFilnam string
+	CfApiFilnam string
+	ZoneFilnam string
+}
+
 
 // yaml version of type acme.Account
 type JsAcnt struct {
@@ -124,6 +136,35 @@ type JsAcnt struct {
     // See https://tools.ietf.org/html/rfc8555#section-7.3.4 for more details.
     ExternalAccountBinding *acme.ExternalAccountBinding `yaml: "ExtAcct"`
 }
+
+
+func InitCertLib()(certobj *certLibObj, err error) {
+
+	certObj:=certLibObj {}
+    zoneDir := os.Getenv("zoneDir")
+    if len(zoneDir) == 0 {return nil, fmt.Errorf("could not resolve env var zoneDir!")}
+	certObj.ZoneDir = zoneDir
+
+    certDir := os.Getenv("certDir")
+    if len(certDir) == 0 {return nil, fmt.Errorf("could not resolve env var certDir!")}
+	certObj.ZoneFilnam = zoneDir + "/cfDomainsShort.yaml"
+	certObj.CertDir = certDir
+
+
+    leAcnt := os.Getenv("LEAcnt")
+    if len(leAcnt) < 1 {return nil, fmt.Errorf("could not resolve env var LEAcnt!")}
+	certObj.LeDir = leAcnt
+//    csrFilnam := leAcnt + "csrList/csrTest.yaml"
+
+    cfDir := os.Getenv("Cloudflare")
+    if len(cfDir) == 0 {return nil, fmt.Errorf("could not resolve env var cfDir!")}
+	certObj.CfDir = cfDir
+    certObj.CfApiFilnam = cfDir + "/token/cfDns.yaml"
+
+	return &certObj, nil
+}
+
+
 
 func GetCertDir(envVar string)(certDir string, err error) {
 
@@ -670,10 +711,12 @@ func CleanCsrFil (csrFilnam string, csrList *CsrList) (err error) {
         domain.TokUrl = ""
         domain.TokIssue = time.Time{}
         domain.TokExp = time.Time{}
+		domain.OrderUrl = ""
         csrList.Domains[i] = domain
     }
 
     csrList.LastLU = time.Now()
+	csrList.OrderUrl = ""
     err = WriteCsrFil(csrFilnam, csrList)
     if err != nil { return fmt.Errorf("certLib.WriteCsrFil: %v\n", err)}
 
@@ -693,6 +736,7 @@ func PrintCsr(csrlist *CsrList) {
 	} else {
 		fmt.Printf("last lookup: %s\n", csrlist.LastLU.Format(time.RFC1123))
 	}
+	fmt.Printf("  orderUrl:   %s\n", csrlist.OrderUrl)
     numDom := len(csrlist.Domains)
     fmt.Printf("domains: %d\n", numDom)
     for i:=0; i< numDom; i++ {
@@ -704,6 +748,7 @@ func PrintCsr(csrlist *CsrList) {
      	fmt.Printf("  token:    %s\n", csrdat.Token)
 		fmt.Printf("  tokval:   %s\n", csrdat.TokVal)
 		fmt.Printf("  tokUrl:   %s\n", csrdat.TokUrl)
+		fmt.Printf("  orderUrl:   %s\n", csrdat.OrderUrl)
 		if csrdat.TokIssue.IsZero() {
 			fmt.Printf("  tok issue:  NA\n")
 		} else {
@@ -1014,3 +1059,18 @@ func PrintCsrReq(req *x509.CertificateRequest) {
 
 	fmt.Println("****************** End CSR ******************")
 }
+
+
+func PrintCertObj(cert *certLibObj) {
+
+	fmt.Printf("**************** certLibObj *****************\n")
+	fmt.Printf("ZoneDir:     %s\n", cert.ZoneDir)
+	fmt.Printf("CertDir:     %s\n", cert.CertDir)
+	fmt.Printf("LE Dir:      %s\n", cert.LeDir)
+	fmt.Printf("CF Dir:      %s\n", cert.CfDir)
+	fmt.Printf("Csr File:    %s\n", cert.CsrFilnam)
+	fmt.Printf("Cf Api File: %s\n", cert.CfApiFilnam)
+	fmt.Printf("************** end certLibObj ***************\n")
+}
+
+
