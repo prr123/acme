@@ -31,8 +31,9 @@ type LEObj struct {
 	Client *acme.Client
 	Acnt *acme.Account
 	Contacts []string `yaml:"contacts"`
+	Remove bool `yaml:"remove"`
 	Dbg bool `yaml:"debug"`
-	Rem bool `yaml:"remove"`
+	AcmeDir string `yaml:"AcmeDir"`
 }
 
 
@@ -194,10 +195,10 @@ func WriteCsrFil(outFilnam string, csrDatList *CsrList) (err error) {
 }
 
 // function that creates a new client
-func CreateNewLEAccount() (le *LEObj, err error) {
+func CreateLEAccount() (le *LEObj, err error) {
 
 	var LEAcnt LEObj
-	
+
 	ctx := context.Background()
 
 	// find LE folder
@@ -213,14 +214,20 @@ func CreateNewLEAccount() (le *LEObj, err error) {
 		return nil, fmt.Errorf("no contact yaml file: %v", err)
 	}
 
-	var leAcntDat LEObj
+//	var leAcntDat LEObj
+	leAcntDat := LEObj{}
+
     err = yaml.Unmarshal(contData, &leAcntDat)
     if err != nil {
         return nil, fmt.Errorf("yaml Unmarshal: %v\n", err)
     }
 
+	remove := leAcntDat.Remove
 	dbg := leAcntDat.Dbg
-	remove := leAcntDat.Rem
+
+    AcmeDir := "https://acme-staging-v02.api.letsencrypt.org/directory"
+	if len(leAcntDat.AcmeDir) > 0 {AcmeDir = leAcntDat.AcmeDir}
+
 	if dbg {PrintLEAcnt(&leAcntDat)}
 
 	privFilnam := LEDir + "LE_priv.key"
@@ -248,21 +255,18 @@ func CreateNewLEAccount() (le *LEObj, err error) {
 		}
 	}
 
-
-
     akey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
     if err != nil { return nil, fmt.Errorf("Generate Key: %v", err)}
 
-	//save key
-
     if dbg {log.Printf("newClient: key generated!\n")}
 
+
     client := &acme.Client{Key: akey}
-    client.DirectoryURL = "https://acme-staging-v02.api.letsencrypt.org/directory"
+    client.DirectoryURL = AcmeDir
 
     if dbg {
         log.Printf("Directory Url: %s\n", client.DirectoryURL)
-        log.Printf("success client created! printing client\n")
+        log.Printf("success client created!\n")
         PrintClient(client)
     }
 	LEAcnt.Client = client
@@ -531,6 +535,13 @@ func CreateCsr(csrTpl x509.CertificateRequest, certKey *ecdsa.PrivateKey)(csr []
 	return csr, nil
 }
 
+func ParseCsr(csr []byte) (certReq *x509.CertificateRequest, err error) {
+
+	certReq, err = x509.ParseCertificateRequest(csr)
+	if err != nil {return nil, fmt.Errorf("ParseCertificateRequest: %v", err)}
+
+	return certReq, nil
+}
 
 func EncodeKey(privateKey *ecdsa.PrivateKey, publicKey *ecdsa.PublicKey) (string, string) {
     x509Encoded, _ := x509.MarshalECPrivateKey(privateKey)
@@ -720,14 +731,15 @@ func PrintCsr(csrlist *CsrList) {
 
 func PrintLEAcnt(acnt *LEObj) {
 
-	fmt.Printf("*********** LEAcnt ******\n")
-
-	fmt.Printf("remove:  %t\n", acnt.Rem)
+	fmt.Printf("*************** LEAcnt *******************\n")
+	fmt.Printf("AcmeDir: %s\n", acnt.AcmeDir)
+	fmt.Printf("remove:  %t\n", acnt.Remove)
 	fmt.Printf("debug:   %t\n", acnt.Dbg)
 	fmt.Printf("contacts: %d\n", len(acnt.Contacts))
 	for i:=0; i< len(acnt.Contacts); i++ {
 		fmt.Printf("contact[%d]: %s\n", i+1, acnt.Contacts[i])
 	}
+	fmt.Printf("*************** End LEAcnt ****************\n")
 }
 
 
@@ -744,7 +756,7 @@ func PrintAccount (acnt *acme.Account) {
     fmt.Println (" *** non RFC 8588 terms:  ***")
     fmt.Printf("  AgreedTerms: %s\n", acnt.AgreedTerms)
     fmt.Printf("  Authz: %s\n", acnt.Authz)
-    fmt.Println("***************** End Account ******************")
+    fmt.Println("***************** End Acme Account ******************")
 }
 
 func PrintJsAccount (acnt *JsAcnt) {
@@ -762,7 +774,11 @@ func PrintJsAccount (acnt *JsAcnt) {
 func PrintClient (client *acme.Client) {
 
     fmt.Println("************** Acme Client ******************")
-    fmt.Printf("Key: %v\n", client.Key)
+	if client.Key != nil {
+    	fmt.Printf("Key exists\n")
+	} else {
+		fmt.Printf("no Key found!\n")
+	}
     fmt.Printf("HTTPClient: %v\n",client.HTTPClient)
     fmt.Printf("Directory: %s\n", client.DirectoryURL)
     fmt.Printf("Retry: %v\n", client.RetryBackoff)
