@@ -42,6 +42,7 @@ type CsrList struct {
 	CertDir string `yaml:"certDir"`
 	LastLU time.Time `yaml:"last"`
 	OrderUrl string `yaml:"orderUrl"`
+	CertUrl string `yaml:"certUrl"`
     Domains []CsrDat `yaml:"domains"`
 }
 
@@ -56,8 +57,18 @@ type CsrDat struct {
 	TokIssue time.Time `yaml:"issue"`
 	TokExp time.Time `yaml:"expire"`
 	OrderUrl string `yaml:"orderUrl"`
+	CertUrl string `yaml:"certUrl"`
     Name pkixName `yaml:"Name"`
 }
+
+type CertList struct {
+	CertNam string `yaml:"certName"`
+	Domains []string `yaml:"domains"`
+	LEUrl string	`yaml:"LEUrl"`
+	Valid	time.Time	`yaml:"valid"`
+	Expire time.Time	`yaml:"expire"`
+}
+
 
 type pkixName struct {
     CommonName string `yaml:"CommonName"`
@@ -73,7 +84,7 @@ type certLibObj struct {
 	CertDir string
 	LeDir string
 	CfDir string
-	CsrFilnam string
+	CsrDir string
 	CfApiFilnam string
 	ZoneFilnam string
 }
@@ -160,6 +171,8 @@ func InitCertLib()(certobj *certLibObj, err error) {
     if len(cfDir) == 0 {return nil, fmt.Errorf("could not resolve env var cfDir!")}
 	certObj.CfDir = cfDir
     certObj.CfApiFilnam = cfDir + "/token/cfDns.yaml"
+
+	certObj.CsrDir = leAcnt+ "/csrList/"
 
 	return &certObj, nil
 }
@@ -720,57 +733,61 @@ func CleanCsrFil (csrFilnam string, csrList *CsrList) (err error) {
     err = WriteCsrFil(csrFilnam, csrList)
     if err != nil { return fmt.Errorf("certLib.WriteCsrFil: %v\n", err)}
 
-    log.Printf("success writing Csr File\n")
+//    log.Printf("success writing Csr File\n")
 
     return nil
 }
 
 
-func PrintCsr(csrlist *CsrList) {
+func PrintCsrList(csrlist *CsrList) {
 
-    fmt.Println("******** Csr List *********")
+    fmt.Println("***************** Csr List *****************")
     fmt.Printf("template: %s\n", csrlist.Template)
 	fmt.Printf("certDir:  %s\n", csrlist.CertDir)
 	if csrlist.LastLU.IsZero() {
-		fmt.Printf("last lookup: NA\n")
+		fmt.Printf("last mod: NA\n")
 	} else {
-		fmt.Printf("last lookup: %s\n", csrlist.LastLU.Format(time.RFC1123))
+		fmt.Printf("last mod: %s\n", csrlist.LastLU.Format(time.RFC1123))
 	}
-	fmt.Printf("  orderUrl:   %s\n", csrlist.OrderUrl)
+	fmt.Printf("orderUrl: %s\n", csrlist.OrderUrl)
+	fmt.Printf("certUrl:  %s\n", csrlist.CertUrl)
     numDom := len(csrlist.Domains)
-    fmt.Printf("domains: %d\n", numDom)
+    fmt.Printf("domains:  %d\n", numDom)
     for i:=0; i< numDom; i++ {
         csrdat := csrlist.Domains[i]
-		fmt.Printf("  ***************************\n")
-        fmt.Printf("  domain:   %s\n", csrdat.Domain)
-        fmt.Printf("  email:    %s\n", csrdat.Email)
-		fmt.Printf("  chal rec: %s\n", csrdat.ChalRecId)
-     	fmt.Printf("  token:    %s\n", csrdat.Token)
-		fmt.Printf("  tokval:   %s\n", csrdat.TokVal)
-		fmt.Printf("  tokUrl:   %s\n", csrdat.TokUrl)
-		fmt.Printf("  orderUrl:   %s\n", csrdat.OrderUrl)
+		fmt.Printf("*****************************************\n")
+        fmt.Printf("domain[%d]\n", i+1)
+		fmt.Printf("===========\n")
+		fmt.Printf("    name:      %s\n", csrdat.Domain)
+        fmt.Printf("    email:     %s\n", csrdat.Email)
+		fmt.Printf("    chal rec:  %s\n", csrdat.ChalRecId)
+     	fmt.Printf("    token:     %s\n", csrdat.Token)
+		fmt.Printf("    tokval:    %s\n", csrdat.TokVal)
+		fmt.Printf("    tokUrl:    %s\n", csrdat.TokUrl)
+		fmt.Printf("    orderUrl:  %s\n", csrdat.OrderUrl)
+		fmt.Printf("    certUrl:   %s\n", csrdat.CertUrl)
 		if csrdat.TokIssue.IsZero() {
-			fmt.Printf("  tok issue:  NA\n")
+			fmt.Printf("    tok issue:  NA\n")
 		} else {
-			fmt.Printf("  tok issue:  %s\n", csrdat.TokIssue.Format(time.RFC1123))
+			fmt.Printf("    tok issue:  %s\n", csrdat.TokIssue.Format(time.RFC1123))
 		}
 		if csrdat.TokExp.IsZero() {
-			fmt.Printf("  tok exp:    NA\n")
+			fmt.Printf("    tok exp:    NA\n")
 		} else {
-			fmt.Printf("  tok exp:    %s\n", csrdat.TokExp.Format(time.RFC1123))
+			fmt.Printf("    tok exp:    %s\n", csrdat.TokExp.Format(time.RFC1123))
 		}
 
-	    fmt.Printf("  name:\n")
+	    fmt.Printf("    name:\n")
         nam:= csrdat.Name
-        fmt.Printf("    CommonName:   %s\n", nam.CommonName)
-        fmt.Printf("    Country:      %s\n", nam.Country)
-        fmt.Printf("    Province:     %s\n", nam.Province)
-        fmt.Printf("    Locality:     %s\n", nam.Locality)
-        fmt.Printf("    Organisation: %s\n", nam.Organisation)
-        fmt.Printf("    OrgUnit:      %s\n", nam.OrganisationUnit)
+        fmt.Printf("      CommonName:   %s\n", nam.CommonName)
+        fmt.Printf("      Country:      %s\n", nam.Country)
+        fmt.Printf("      Province:     %s\n", nam.Province)
+        fmt.Printf("      Locality:     %s\n", nam.Locality)
+        fmt.Printf("      Organisation: %s\n", nam.Organisation)
+        fmt.Printf("      OrgUnit:      %s\n", nam.OrganisationUnit)
     }
 
-    fmt.Println("******** End Csr List *******")
+    fmt.Println("******************* End Csr List ******************")
 
 }
 
@@ -1068,7 +1085,7 @@ func PrintCertObj(cert *certLibObj) {
 	fmt.Printf("CertDir:     %s\n", cert.CertDir)
 	fmt.Printf("LE Dir:      %s\n", cert.LeDir)
 	fmt.Printf("CF Dir:      %s\n", cert.CfDir)
-	fmt.Printf("Csr File:    %s\n", cert.CsrFilnam)
+	fmt.Printf("Csr Dir:    %s\n", cert.CsrDir)
 	fmt.Printf("Cf Api File: %s\n", cert.CfApiFilnam)
 	fmt.Printf("************** end certLibObj ***************\n")
 }
