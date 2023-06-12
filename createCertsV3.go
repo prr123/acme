@@ -12,10 +12,6 @@ package main
 
 import (
 	"context"
-//    "crypto/ecdsa"
-//    "crypto/elliptic"
-//    "crypto/rand"
-    "crypto/x509"
 
 	"log"
 	"fmt"
@@ -23,7 +19,6 @@ import (
 	"time"
 	"net"
 	"strings"
-
 	"golang.org/x/crypto/acme"
 
     cfLib "acme/acmeDns/cfLib"
@@ -34,35 +29,19 @@ import (
 
 func main() {
 
-	var order *acme.Order
-//	var clientDir acme.Directory
-//	var acnt *acme.Account
-
 	numarg := len(os.Args)
 	dbg := true
     flags:=[]string{"dbg","csr"}
 
-	useStr := "./createCertsV3 [/csr=] [/dbg]"
-	helpStr := "program that creates certs for all domains listed in the file csrList.yaml\n"
+	// default file
+    csrFilnam := "csrTest.yaml"
+	newOrder := &acme.Order{}
+
+	useStr := "./createCertsV3 [/csr=csrfile] [/dbg]"
+	helpStr := "program that creates one certificate for all domains listed in the file csrList.yaml\n"
 	helpStr += "requirements: - a file listing all cloudflare domains/zones controlled by this account\n"
 	helpStr += "              - a cloudflare authorisation file with a token that permits DNS record changes in the direcory cloudflare/token\n"
 	helpStr += "              - a csr yaml file located in $LEAcnt/csrList\n"
-
-	zoneDir := os.Getenv("zoneDir")
-	if len(zoneDir) == 0 {log.Fatalf("could not resolve env var zoneDir!")}
-
-	certDir := os.Getenv("certDir")
-	if len(certDir) == 0 {log.Fatalf("could not resolve env var certDir!")}
-    zoneFilnam := zoneDir + "/cfDomainsShort.yaml"
-
-	leAcnt := os.Getenv("LEAcnt")
-	if len(leAcnt) < 1 {log.Fatalf("could not resolve env var LEAcnt!")}
-
-	csrFilnam := leAcnt + "csrList/csrTest.yaml"
-
-    cfDir := os.Getenv("Cloudflare")
-	if len(cfDir) == 0 {log.Fatalf("could not resolve env var cfDir!")}
-    cfApiFilnam := cfDir + "/token/cfDns.yaml"
 
 	if numarg > 4 {
 		fmt.Println("too many arguments in cl!")
@@ -70,40 +49,40 @@ func main() {
 		os.Exit(-1)
 	}
 
-	if numarg < 1 {
-		fmt.Println("insufficient arguments in cl!")
-		fmt.Println("usage: %s\n", useStr)
-		os.Exit(-1)
-	}
-
 	if numarg > 1 {
 		if os.Args[1] == "help" {
-			fmt.Printf("help: ")
-			fmt.Printf("usage is: %s\n", useStr)
-			fmt.Printf("\n%s\n", helpStr)
+			fmt.Printf("help:\n%s\n", helpStr)
+			fmt.Printf("\nusage is: %s\n", useStr)
 			os.Exit(1)
 		}
         flagMap, err := util.ParseFlags(os.Args, flags)
         if err != nil {log.Fatalf("util.ParseFlags: %v\n", err)}
 
+        _, ok := flagMap["dbg"]
+        if ok {dbg = true}
         if dbg {
             for k, v :=range flagMap {
                 fmt.Printf("k: %s v: %s\n", k, v)
             }
         }
-        _, ok := flagMap["dbg"]
-        if ok {dbg = true}
 
         val, ok := flagMap["csr"]
         if !ok {
             log.Printf("default csrList: %s\n", csrFilnam)
         } else {
             if val.(string) == "none" {log.Fatalf("no yaml file provided with /csr  flag!")}
-            csrFilnam = leAcnt + "/csrList/" + val.(string)
-            log.Printf("using csrList: %s\n", csrFilnam)
+            csrFilnam = val.(string)
+            log.Printf("csrList: %s\n", csrFilnam)
         }
 	}
 
+	certObj, err := certLib.InitCertLib()
+	if err != nil {log.Fatalf("InitCertLib: %v\n", err)}
+    if dbg {certLib.PrintCertObj(certObj)}
+
+	zoneFilnam := certObj.ZoneFilnam
+	cfApiFilnam := certObj.CfApiFilnam
+	csrFilnam = certObj.CsrDir + csrFilnam
 
 	log.Printf("debug: %t\n", dbg)
 	log.Printf("Using zone file: %s\n", zoneFilnam)
@@ -139,7 +118,7 @@ func main() {
 
 	authIdList := make([]acme.AuthzID, numAcmeDom)
 
-	if dbg {certLib.PrintCsr(csrList)}
+	if dbg {certLib.PrintCsrList(csrList)}
 
 	acmeDomList := make([]cfLib.ZoneAcme, numAcmeDom)
 	// see whether acme domains are in zoneList
@@ -165,12 +144,6 @@ func main() {
 	}
 
 	if !foundAllDom {log.Fatalf("csr list file contains domains that are not in the cf account domain list!")}
-
-	// check whether acme domains have challenge records
-	// outcome is:
-	// - all
-	// - partial
-	// - none
 
 	allChalRec := true
 	noChalRec := true
@@ -262,10 +235,10 @@ func main() {
 	// var orderOpt acme.OrderOption
 	// OrderOption is contains optional parameters regarding timing
 
-	order, err = client.AuthorizeOrder(ctx, authIdList)
+	newOrder, err = client.AuthorizeOrder(ctx, authIdList)
 	if err != nil {log.Fatalf("client.AuthorizeOrder: %v\n",err)}
 	log.Printf("received Authorization Order!\n")
-	if dbg {certLib.PrintOrder(*order)}
+	if dbg {certLib.PrintOrder(*newOrder)}
 
 	log.Printf("**** Begin Loop ****\n")
 	// need to loop through domains
@@ -275,7 +248,7 @@ func main() {
 		domain := authIdList[i].Value
 		log.Printf("domain [%d]: %s\n", i+1, domain)
 
-		url := order.AuthzURLs[i]
+		url := newOrder.AuthzURLs[i]
 		acmeZone := acmeDomList[i]
 
 		auth, err := client.GetAuthorization(ctx, url)
@@ -327,11 +300,10 @@ func main() {
 	log.Printf("success creating all dns challenge records!")
 
 	csrList.LastLU = time.Now()
-	csrList.OrderUrl = order.URI
+	csrList.OrderUrl = newOrder.URI
+	csrList.CertUrl = ""
 	err = certLib.WriteCsrFil(csrFilnam, csrList)
 	if err != nil {log.Fatal("certLib.WriteCsrFil: %v\n", err)}
-
-//	os.Exit(1)
 
 	// we need to check whether newly add Dns Records have propagated
 	log.Printf("performing lookup for all challenge records")
@@ -387,8 +359,8 @@ ProcOrder:
 	log.Printf("arrived at ProcOrd\n")
 
 //	orderUrl := order.URI
-	certUrl := csrList.OrderUrl
-	if len(certUrl) == 0 {log.Fatalf("no order Url in CsrListFile!\n")}
+	ordUrl := csrList.OrderUrl
+	if len(ordUrl) == 0 {log.Fatalf("no order Url in CsrListFile!\n")}
 
 	// ready for sending an accept; checked dns propogation with lookup
 	for i:=0; i< numAcmeDom; i++ {
@@ -411,22 +383,20 @@ ProcOrder:
 
 	}
 
-	tmpord, err := client.GetOrder(ctx, certUrl)
+	tmpord, err := client.GetOrder(ctx, ordUrl)
 	if err !=nil {log.Fatalf("order error: %v\n", err)}
 	if dbg {certLib.PrintOrder(*tmpord)}
 
     log.Printf("waiting for order\n")
-	if dbg {log.Printf("order url: %s\n", certUrl)}
+	if dbg {log.Printf("order url: %s\n", ordUrl)}
 
-    ord2, err := client.WaitOrder(ctx, certUrl)
+    ordUrl2, err := client.WaitOrder(ctx, ordUrl)
     if err != nil {
-		if ord2 != nil {certLib.PrintOrder(*ord2)}
+		if ordUrl2 != nil {certLib.PrintOrder(*ordUrl2)}
 		log.Fatalf("client.WaitOrder: %v\n",err)
 	}
 	log.Printf("received order!\n")
-
-	if dbg {certLib.PrintOrder(*ord2)}
-
+	if dbg {certLib.PrintOrder(*ordUrl2)}
 
 	csrData := csrList.Domains[0]
 
@@ -438,8 +408,8 @@ ProcOrder:
 	if err != nil {log.Fatalf("GenerateCertName: %v", err)}
 	if dbg {log.Printf("certNam: %s\n", certNam)}
 
-	keyFilnam := certDir + "/" + certNam + ".key"
-	certFilnam := certDir + "/" + certNam + ".crt"
+	keyFilnam := certObj.CertDir + "/" + certNam + ".key"
+	certFilnam := certObj.CertDir + "/" + certNam + ".crt"
 	log.Printf("key file: %s cert file: %s\n", keyFilnam, certFilnam)
 
 //	certKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
@@ -462,20 +432,21 @@ ProcOrder:
 	csr, err := certLib.CreateCsr(csrTpl, certKey)
 	if err != nil {	log.Fatalf("CreateCertReq: %v",err)}
 
-	csrParseReq, err := x509.ParseCertificateRequest(csr)
+	csrParseReq, err := certLib.ParseCsr(csr)
 	if err != nil {log.Fatalf("Error parsing certificate request: %v", err)}
 
 	// need to compare csrParse and template
 	certLib.PrintCsrReq(csrParseReq)
 
-	FinalUrl := ord2.FinalizeURL
+	FinalUrl := ordUrl2.FinalizeURL
 	log.Printf("FinalUrl: %s\n", FinalUrl)
 
 	derCerts, certUrl, err := client.CreateOrderCert(ctx, FinalUrl, csr, true)
 	if err != nil {log.Fatalf("CreateOrderCert: %v\n",err)}
 
-	log.Printf("derCerts: %d certUrl: %s\n", len(derCerts), certUrl)
+	if dbg {log.Printf("derCerts: %d certUrl: %s\n", len(derCerts), certUrl)}
 
+	csrList.CertUrl = certUrl
 	// write the pem encoded certificate chain to file
 	log.Printf("Saving certificate to: %s", certFilnam)
 
@@ -492,8 +463,10 @@ ProcOrder:
 		log.Printf("deleted DNS Chal Record for zone: %s\n", acmeZone.Name)
 	}
 
+	if dbg {certLib.PrintCsrList(csrList) }
 	err = certLib.CleanCsrFil(csrFilnam, csrList)
 	if err != nil {log.Fatalf("CleanCsrFil: %v\n",err)}
+	log.Printf("success writing Csr File\n")
 
 	log.Printf("success creating Certs\n")
 }
