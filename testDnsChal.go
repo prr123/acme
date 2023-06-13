@@ -20,10 +20,7 @@ import (
 	"net"
 	"strings"
 
-//    yaml "github.com/goccy/go-yaml"
-//	"golang.org/x/crypto/acme"
-//	"github.com/cloudflare/cloudflare-go"
-
+    util "github.com/prr123/utility/utilLib"
     cfLib "acme/acmeDns/cfLib"
 	certLib "acme/acmeDns/certLib"
 )
@@ -31,65 +28,75 @@ import (
 
 func main() {
 
-//	var order *acme.Order
-//	var clientDir acme.Directory
-//	var acnt *acme.Account
-
 	numarg := len(os.Args)
 	dbg := true
 
-	log.Printf("debug: %t\n", dbg)
+    flags:=[]string{"dbg","csr"}
+    csrFilnam := "csrTest.yaml"
 
-	useStr := "./testAcmeProp"
+	useStr := "./testDnsChal [/csr=csrfile] [/dbg]"
 	helpStr := "program that tests propagation of Acme Dns records!"
-
-	zoneDir := os.Getenv("zoneDir")
-	if len(zoneDir) == 0 {log.Fatalf("could not resolve env var zoneDir!")}
-
-	certDir := os.Getenv("certDir")
-	if len(certDir) == 0 {log.Fatalf("could not resolve env var certDir!")}
-
-    zoneFilnam := zoneDir + "/cfDomainsShort.yaml"
-
-	csrFilnam := "csrList.yaml"
-
-    cfDir := os.Getenv("Cloudflare")
-	if len(cfDir) == 0 {log.Fatalf("could not resolve env var cfDir!")}
 
 //    cfApiFilnam := cfDir + "/token/cfDns.yaml"
 
-	if numarg > 2 {
+	if numarg > 4 {
 		fmt.Println("too many arguments in cl!")
 		fmt.Println("usage: %s\n", useStr)
 		os.Exit(-1)
 	}
 
-	if numarg < 1 {
-		fmt.Println("insufficient arguments in cl!")
-		fmt.Println("usage: %s\n", useStr)
-		os.Exit(-1)
-	}
-
-	if numarg == 2 {
+	if numarg > 1 {
 		if os.Args[1] == "help" {
 			fmt.Printf("help: ")
 			fmt.Printf("usage is: %s\n", useStr)
 			fmt.Printf("\n%s\n", helpStr)
 			os.Exit(1)
 		}
-		csrFilnam = os.Args[1]
+
+       flagMap, err := util.ParseFlags(os.Args, flags)
+        if err != nil {log.Fatalf("util.ParseFlags: %v\n", err)}
+
+        _, ok := flagMap["dbg"]
+        if ok {dbg = true}
+        if dbg {
+            for k, v :=range flagMap {
+                fmt.Printf("k: %s v: %s\n", k, v)
+            }
+        }
+
+        val, ok := flagMap["csr"]
+        if !ok {
+            log.Printf("default csrList: %s\n", csrFilnam)
+        } else {
+            if val.(string) == "none" {log.Fatalf("no yaml file provided with /csr  flag!")}
+            csrFilnam = val.(string)
+            log.Printf("using csrList: %s\n", csrFilnam)
+        }
 	}
 
-	log.Printf("Using zone file: %s\n", zoneFilnam)
-	log.Printf("Using csr file: %s\n", csrFilnam)
+
+    certObj, err := certLib.InitCertLib()
+    if err != nil {log.Fatalf("InitCertLib: %v\n", certObj)}
+    if dbg {certLib.PrintCertObj(certObj)}
 
 
-	// reading all domain names served by cloudflare
+    zoneFilnam := certObj.ZoneFilnam
+//    cfApiFilnam := certObj.CfApiFilnam
+    csrFilnam = certObj.CsrDir + csrFilnam
+
+    log.Printf("debug: %t\n", dbg)
+    log.Printf("Using zone file: %s\n", zoneFilnam)
+    log.Printf("Using csr file: %s\n", csrFilnam)
+
+//    cfApiObj, err := cfLib.InitCfApi(cfApiFilnam)
+//    if err != nil {log.Fatalf("cfLib.InitCfApi: %v\n", err)}
+//    log.Printf("success: init cf api\n")
+
+    // reading all domain names served by cloudflare
     zoneList, err := cfLib.ReadZoneShortFile(zoneFilnam)
     if err != nil {log.Fatalf("ReadZoneFileShort: %v\n", err)}
-
-	log.Printf("success reading all cf zones!\n")
-	if dbg {cfLib.PrintZoneList(zoneList)}
+    if dbg {log.Printf("success reading all cf zones!\n")}
+    if dbg {cfLib.PrintZoneList(zoneList)}
 
 	numZones := len(zoneList.Zones)
 
@@ -107,12 +114,9 @@ func main() {
 
 //	authIdList := make([]acme.AuthzID, numAcmeDom)
 
-	if dbg {certLib.PrintCsr(csrList)}
+	if dbg {certLib.PrintCsrList(csrList)}
 
 	acmeDomList := make([]cfLib.ZoneAcme, numAcmeDom)
-	// see whether acme domains are in zoneList
-
-//	chalList := make([]acme.Challenge, numAcmeDom)
 
 	// get api for DNS use default yaml file
 
