@@ -53,8 +53,12 @@ func main() {
 
 	ledir, err := client.Discover(ctx)
 	if err != nil {log.Fatalf("Discover error: %v\n", err)}
-
 	log.Printf("success getting client dir\n")
 	certLib.PrintDir(ledir)
+
+    acnt, err := client.GetReg(ctx, "")
+    if err != nil {log.Fatalf("could not find LE Client Account: getReg: %v\n", err)}
+    if dbg {certLib.PrintAccount(acnt)}
+    log.Printf("success retrieving LE Account\n")
 }
 
