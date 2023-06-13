@@ -534,8 +534,8 @@ func CreateCsrTpl(csrData CsrDat) (template x509.CertificateRequest) {
 		RawSubject:         asn1Subj,
 //  	EmailAddresses:     []string{emailAddress}, !not allowed for let's encrypt!!
 		SignatureAlgorithm: x509.ECDSAWithSHA256,
-		DNSNames: []string{},
-//		DNSNames: []string{csrData.Domain},
+//		DNSNames: []string{},
+		DNSNames: []string{csrData.Domain},
 	}
 	return template
 }
