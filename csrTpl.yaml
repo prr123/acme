@@ -1,6 +1,6 @@
 ---
-template: csr
-certDir:
+account: [yaml account file in LEAcnt]
+name: [key file name]
 domain:
 email:
 Name:
