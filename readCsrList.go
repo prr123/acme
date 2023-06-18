@@ -11,6 +11,7 @@ import (
 	"os"
 	"fmt"
 	"log"
+	"context"
 
 	certLib "acme/acmeDns/certLib"
     util "github.com/prr123/utility/utilLib"
@@ -30,16 +31,7 @@ func main() {
 		log.Fatalf("too many cli args\n")
 	}
 
-	
-//	if numArg < 2 {	}
-
-
-	leAcnt := os.Getenv("LEAcnt")
-	if len(leAcnt) < 1 {
-		log.Fatalf("cannot find envVar LEAcnt\n")
-	}
-	csrDirnam := leAcnt + "/csrList"
-	yamlFilnam := csrDirnam + "/csrTest.yaml"
+    csrFilnam := "csrTest.yaml"
 	dbg := false
 
 	if numArg > 1 {
@@ -61,23 +53,48 @@ func main() {
 
 		val, ok := flagMap["csr"]
 		if !ok {
-			log.Printf("default csrList: %s\n", yamlFilnam)
+			log.Printf("default csrList: %s\n", csrFilnam)
 		} else {
 			if val.(string) == "none" {log.Fatalf("no yaml file provided with /csr  flag!")}
-			yamlFilnam = csrDirnam + "/" + val.(string)
-			log.Printf("using csrList: %s\n", yamlFilnam)
+            csrFilnam = val.(string)
+            log.Printf("csrList: %s\n", csrFilnam)
 		}
 
 	}
 
+    certObj, err := certLib.InitCertLib()
+    if err != nil {log.Fatalf("InitCertLib: %v\n", err)}
+    if dbg {certLib.PrintCertObj(certObj)}
+
+    csrFilnam = certObj.CsrDir + csrFilnam
+
 	log.Printf("dbg: %t\n", dbg)
+	log.Printf("Using csr file: %s\n", csrFilnam)
 
-//	os.Exit(1)
-
-	csrList, err := certLib.ReadCsrFil(yamlFilnam)
+	csrList, err := certLib.ReadCsrFil(csrFilnam)
 	if err != nil {log.Fatalf("ReadCsrFil: %v", err)}
-	
-	certLib.PrintCsr(csrList)
-	log.Printf("success readCsrList.go\n")
+
+	certLib.PrintCsrList(csrList)
+	log.Printf("success reading readCsrList.go\n")
+
+	acntFil := csrList.Acnt
+	log.Printf("testing account file: %s!\n", acntFil)
+
+	ctx := context.Background()
+
+    client, err := certLib.GetLEClient(acntFil, true)
+    if err != nil {log.Fatalf("getLEClient: %v\n", err)}
+
+//    certLib.PrintClient(client)
+
+    ledir, err := client.Discover(ctx)
+    if err != nil {log.Fatalf("Discover error: %v\n", err)}
+    log.Printf("success getting client dir\n")
+    certLib.PrintDir(ledir)
+
+    acnt, err := client.GetReg(ctx, "")
+    if err != nil {log.Fatalf("could not find LE Client Account: getReg: %v\n", err)}
+    if dbg {certLib.PrintAccount(acnt)}
+    log.Printf("success retrieving LE Account\n")
 }
 
