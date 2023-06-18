@@ -28,18 +28,24 @@ import (
 )
 
 type LEObj struct {
-	Client *acme.Client
-	Acnt *acme.Account
+	AcntName string `yaml:"AcntName"`
+	AcntId string `yaml:"AcntId"`
+	PrivKeyFilnam string `yaml:"PrivKeyFilnam"`
+	PubKeyFilnam string `yaml:"PubKeyFilnam"`
+	Updated time.Time `yaml:"update"`
+//	Client *acme.Client
+//	Acnt *acme.Account
 	Contacts []string `yaml:"contacts"`
 	Remove bool `yaml:"remove"`
-	Dbg bool `yaml:"debug"`
-	AcmeDir string `yaml:"AcmeDir"`
+	UseProd bool `yaml:"useProd"`
+	TestUrl string `yaml:"TestUrl"`
+	ProdUrl string `yaml:"ProdUrl"`
 }
 
 
 type CsrList struct {
-    Template string `yaml:"template"`
-	CertDir string `yaml:"certDir"`
+    Acnt string `yaml:"account"`
+    AcntName string `yaml:"name"`
 	LastLU time.Time `yaml:"last"`
 	OrderUrl string `yaml:"orderUrl"`
 	CertUrl string `yaml:"certUrl"`
@@ -249,9 +255,9 @@ func WriteCsrFil(outFilnam string, csrDatList *CsrList) (err error) {
 }
 
 // function that creates a new client
-func CreateLEAccount() (le *LEObj, err error) {
+func CreateLEAccount(acntFilnam string, dbg bool) (le *LEObj, err error) {
 
-	var LEAcnt LEObj
+//	var LEAcnt LEObj
 
 	ctx := context.Background()
 
@@ -262,30 +268,40 @@ func CreateLEAccount() (le *LEObj, err error) {
 	}
 
 	// check for existing keys and yaml file
-	contactFil := LEDir + "contacts.yaml"
-	contData, err := os.ReadFile(contactFil)
-	if err != nil {
-		return nil, fmt.Errorf("no contact yaml file: %v", err)
-	}
+	if acntFilnam == "" {acntFilnam = "LEAcnt.yaml"}
+	acntFilnam = LEDir + acntFilnam
+	acntData, err := os.ReadFile(acntFilnam)
+	if err != nil {return nil, fmt.Errorf("account ReadFile: %v", err)}
 
 //	var leAcntDat LEObj
-	leAcntDat := LEObj{}
+	leAcnt := LEObj{}
 
-    err = yaml.Unmarshal(contData, &leAcntDat)
-    if err != nil {
-        return nil, fmt.Errorf("yaml Unmarshal: %v\n", err)
-    }
+    err = yaml.Unmarshal(acntData, &leAcnt)
+    if err != nil {return nil, fmt.Errorf("yaml Unmarshal account file: %v\n", err)}
 
-	remove := leAcntDat.Remove
-	dbg := leAcntDat.Dbg
+	if len(leAcnt.AcntName) < 1 {return nil, fmt.Errorf("no AcntName provided!\n")}
 
-    AcmeDir := "https://acme-staging-v02.api.letsencrypt.org/directory"
-	if len(leAcntDat.AcmeDir) > 0 {AcmeDir = leAcntDat.AcmeDir}
+	remove := leAcnt.Remove
+	useProd := leAcnt.UseProd
 
-	if dbg {PrintLEAcnt(&leAcntDat)}
+	LeUrl :=""
+	if useProd {
+		LeUrl = leAcnt.ProdUrl
+	} else {
+		LeUrl = leAcnt.TestUrl
+//		LeUrl = "https://acme-staging-v02.api.letsencrypt.org/directory"
+	}
 
-	privFilnam := LEDir + "LE_priv.key"
-	pubFilnam := LEDir + "LE_pub.key"
+	if dbg {PrintLEAcnt(&leAcnt)}
+
+	privFilnam := LEDir + leAcnt.AcntName + "_priv.key"
+	pubFilnam := LEDir + leAcnt.AcntName + "_pub.key"
+	if dbg {
+		fmt.Printf("privFilnam: %s\n", privFilnam)
+		fmt.Printf("pubFilnam: %s\n", pubFilnam)
+	}
+	leAcnt.PrivKeyFilnam = privFilnam
+	leAcnt.PubKeyFilnam = pubFilnam
 
 	_, err = os.Stat(privFilnam)
 	if err == nil {
@@ -315,32 +331,36 @@ func CreateLEAccount() (le *LEObj, err error) {
     if dbg {log.Printf("newClient: key generated!\n")}
 
 
-    client := &acme.Client{Key: akey}
-    client.DirectoryURL = AcmeDir
+    client := &acme.Client{
+		Key: akey,
+		DirectoryURL: LeUrl,
+		}
 
     if dbg {
         log.Printf("Directory Url: %s\n", client.DirectoryURL)
         log.Printf("success client created!\n")
-        PrintClient(client)
+//        PrintClient(client)
     }
-	LEAcnt.Client = client
-	LEAcnt.Contacts = leAcntDat.Contacts
 
-	var acntTpl acme.Account
-	acntTpl.Contact = leAcntDat.Contacts
+	acntTpl:= acme.Account{
+		Contact: leAcnt.Contacts,
+	}
 
     acnt, err := client.Register(ctx, &acntTpl, acme.AcceptTOS)
     if err != nil { return nil, fmt.Errorf("client.Register: %v", err)}
 
-	LEAcnt.Acnt = acnt
+//	LEAcnt.Acnt = acnt
 
 	log.Printf("success CA account generated\n")
 
-    if dbg {PrintAccount(acnt)}
+    if dbg {
+		PrintClient(client)
+		PrintAccount(acnt)
+	}
 
 	privateKey := (client.Key).(*ecdsa.PrivateKey)
 
-    var publicKey *ecdsa.PublicKey
+    publicKey := &ecdsa.PublicKey{}
 
     publicKey = &privateKey.PublicKey
 
@@ -359,13 +379,25 @@ func CreateLEAccount() (le *LEObj, err error) {
     err = os.WriteFile(pubFilnam, pemEncodedPub, 0644)
     if err != nil {return nil, fmt.Errorf("pem pub key write file: %v", err)}
 
-    return &LEAcnt, nil
+	leAcnt.Updated = time.Now()
+	leAcnt.AcntId = string(client.KID)
+
+    newAcntData, err := yaml.Marshal(&leAcnt)
+    if err != nil {return nil, fmt.Errorf("yaml Unmarshal account file: %v\n", err)}
+
+	if err = os.WriteFile(acntFilnam, newAcntData, 0600); err != nil {
+        return nil, fmt.Errorf("Error writing key file %q: %v", acntFilnam, err)
+    }
+
+	log.Printf("wrote new LE Account file\n")
+
+    return &leAcnt, nil
 }
 
-func GetLEClient() (cl *acme.Client, err error) {
 
-	var client acme.Client
-//	ctx := context.Background()
+func GetLEClient(acntFilnam string, dbg bool) (cl *acme.Client, err error) {
+
+	client :=acme.Client{}
 
 	// find LE folder
 	LEDir, err := GetCertDir("LEAcnt")
@@ -373,25 +405,35 @@ func GetLEClient() (cl *acme.Client, err error) {
 		return nil, fmt.Errorf("GetCertDir: %v", err)
 	}
 
-	// check for existing keys and yaml file
-	contactFil := LEDir + "contacts.yaml"
-	contData, err := os.ReadFile(contactFil)
-	if err != nil {
-		return nil, fmt.Errorf("no contact yaml file: %v", err)
+	if len(acntFilnam) == 0 {
+		log.Printf("no account file provided using default!")
+		acntFilnam = "LEAcnt.yaml"
+	}
+	acntFilnam = LEDir + acntFilnam
+	log.Printf("account file: %s\n", acntFilnam)
+
+	acntData, err := os.ReadFile(acntFilnam)
+	if err != nil {return nil, fmt.Errorf("account ReadFile: %v", err)}
+
+	leAcnt := LEObj{}
+
+    err = yaml.Unmarshal(acntData, &leAcnt)
+    if err != nil {return nil, fmt.Errorf("yaml Unmarshal account file: %v\n", err)}
+	if dbg {PrintLEAcnt(&leAcnt)}
+
+	if len(leAcnt.AcntId) == 0 {
+		return nil, fmt.Errorf("no CA acount id found!\n")
 	}
 
-	var leAcntDat LEObj
-    err = yaml.Unmarshal(contData, &leAcntDat)
-    if err != nil {
-        return nil, fmt.Errorf("yaml Unmarshal: %v\n", err)
-    }
+	if len(leAcnt.PrivKeyFilnam) == 0 {
+		return nil, fmt.Errorf("no private Key file name found!\n")
+	}
+	if len(leAcnt.PubKeyFilnam) == 0 {
+		return nil, fmt.Errorf("no public Key file name found!\n")
+	}
 
-	dbg := leAcntDat.Dbg
-//	remove := leAcntDat.Rem
-	if dbg {PrintLEAcnt(&leAcntDat)}
-
-	privFilnam := LEDir + "LE_priv.key"
-	pubFilnam := LEDir + "LE_pub.key"
+	privFilnam := leAcnt.PrivKeyFilnam
+	pubFilnam := leAcnt.PubKeyFilnam
 
 	_, err = os.Stat(privFilnam)
 	if err != nil {
@@ -428,7 +470,7 @@ func GetLEClient() (cl *acme.Client, err error) {
     return &client, nil
 }
 
-/*
+
 // registers client with the acme server
 func RegisterClient(ctx context.Context, client *acme.Client, contacts []string, dbg bool)(ac *acme.Account, err error) {
 
@@ -445,7 +487,6 @@ func RegisterClient(ctx context.Context, client *acme.Client, contacts []string,
 
     return acnt, nil
 }
-*/
 
 // generate cert names
 func GenerateCertName(domain string)(certName string, err error) {
@@ -540,7 +581,6 @@ func CreateCsrTpl(csrData CsrDat) (template x509.CertificateRequest) {
 	return template
 }
 
-//xxx
 // create certficate sign request
 func CreateCsrTplNew(csrList *CsrList, domIdx int) (template x509.CertificateRequest, err error) {
 
@@ -738,12 +778,12 @@ func CleanCsrFil (csrFilnam string, csrList *CsrList) (err error) {
     return nil
 }
 
-
+//xx
 func PrintCsrList(csrlist *CsrList) {
 
     fmt.Println("***************** Csr List *****************")
-    fmt.Printf("template: %s\n", csrlist.Template)
-	fmt.Printf("certDir:  %s\n", csrlist.CertDir)
+    fmt.Printf("Account: %s\n", csrlist.Acnt)
+    fmt.Printf("Name:    %s\n", csrlist.AcntName)
 	if csrlist.LastLU.IsZero() {
 		fmt.Printf("last mod: NA\n")
 	} else {
@@ -794,10 +834,14 @@ func PrintCsrList(csrlist *CsrList) {
 func PrintLEAcnt(acnt *LEObj) {
 
 	fmt.Printf("*************** LEAcnt *******************\n")
-	fmt.Printf("AcmeDir: %s\n", acnt.AcmeDir)
-	fmt.Printf("remove:  %t\n", acnt.Remove)
-	fmt.Printf("debug:   %t\n", acnt.Dbg)
-	fmt.Printf("contacts: %d\n", len(acnt.Contacts))
+	fmt.Printf("Acnt Name:  %s\n", acnt.AcntName)
+	fmt.Printf("AcntId:     %s\n", acnt.AcntId)
+	fmt.Printf("update:     %s\n", acnt.Updated.Format(time.RFC1123))
+	fmt.Printf("Test Url:   %s\n", acnt.ProdUrl)
+	fmt.Printf("Prod Url:   %s\n", acnt.ProdUrl)
+	fmt.Printf("remove:     %t\n", acnt.Remove)
+	fmt.Printf("useProd:    %t\n", acnt.UseProd)
+	fmt.Printf("contacts:   %d\n", len(acnt.Contacts))
 	for i:=0; i< len(acnt.Contacts); i++ {
 		fmt.Printf("contact[%d]: %s\n", i+1, acnt.Contacts[i])
 	}
