@@ -161,17 +161,13 @@ func InitCertLib()(certobj *certLibObj, err error) {
     zoneDir := os.Getenv("zoneDir")
     if len(zoneDir) == 0 {return nil, fmt.Errorf("could not resolve env var zoneDir!")}
 	certObj.ZoneDir = zoneDir
-
-    certDir := os.Getenv("certDir")
-    if len(certDir) == 0 {return nil, fmt.Errorf("could not resolve env var certDir!")}
 	certObj.ZoneFilnam = zoneDir + "/cfDomainsShort.yaml"
-	certObj.CertDir = certDir
-
 
     leAcnt := os.Getenv("LEAcnt")
     if len(leAcnt) < 1 {return nil, fmt.Errorf("could not resolve env var LEAcnt!")}
-	certObj.LeDir = leAcnt
+	certObj.LeDir = leAcnt + "/account"
 //    csrFilnam := leAcnt + "csrList/csrTest.yaml"
+	certObj.CertDir = leAcnt + "/certs"
 
     cfDir := os.Getenv("Cloudflare")
     if len(cfDir) == 0 {return nil, fmt.Errorf("could not resolve env var cfDir!")}
@@ -186,11 +182,6 @@ func InitCertLib()(certobj *certLibObj, err error) {
 
 
 func GetCertDir(envVar string)(certDir string, err error) {
-
-    certDir = os.Getenv(envVar)
-    if len(certDir) == 0 {
-		return "", fmt.Errorf("no env %s found!", envVar)
-    }
 
     // This returns an *os.FileInfo type
     fileInfo, err := os.Stat(certDir)
@@ -266,6 +257,7 @@ func CreateLEAccount(acntFilnam string, dbg bool) (le *LEObj, err error) {
 	if err != nil {
 		return nil, fmt.Errorf("GetCertDir: %v", err)
 	}
+	LEDir = LEdir + "account/"
 
 	// check for existing keys and yaml file
 	if acntFilnam == "" {acntFilnam = "LEAcnt.yaml"}
@@ -404,6 +396,7 @@ func GetLEClient(acntFilnam string, dbg bool) (cl *acme.Client, err error) {
 	if err != nil {
 		return nil, fmt.Errorf("GetCertDir: %v", err)
 	}
+	LEDir = LEDir + "account/"
 
 	if len(acntFilnam) == 0 {
 		log.Printf("no account file provided using default!")
@@ -721,6 +714,7 @@ func GetAcmeClient() (cl *acme.Client, err error) {
 	if err != nil {
 		return nil, fmt.Errorf("GetCertDir LEAcnt: %v", err)
 	}
+	LEDir = LEDir + "account/"
 
 	privFilNam := LEDir + "LE_priv.key"
 	pubFilNam := LEDir + "LE_pub.key"
