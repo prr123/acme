@@ -77,12 +77,12 @@ func main() {
 	certLib.PrintCsrList(csrList)
 	log.Printf("success reading readCsrList.go\n")
 
-	acntFil := csrList.Acnt
-	log.Printf("testing account file: %s!\n", acntFil)
+	acntNam := csrList.AcntName
+	log.Printf("testing account file with name: %s!\n", acntNam)
 
 	ctx := context.Background()
 
-    client, err := certLib.GetLEClient(acntFil, true)
+    client, err := certLib.GetLEClient(acntNam, true)
     if err != nil {log.Fatalf("getLEClient: %v\n", err)}
 
 //    certLib.PrintClient(client)
