@@ -181,7 +181,11 @@ func InitCertLib()(certobj *certLibObj, err error) {
 
 
 
-func GetCertDir(envVar string)(certDir string, err error) {
+func GetCertDir(acntNam string)(certDir string, err error) {
+
+    leAcnt := os.Getenv("LEAcnt")
+    if len(leAcnt) < 1 {return "", fmt.Errorf("could not resolve env var LEAcnt!")}
+	certDir = leAcnt + "/account"
 
     // This returns an *os.FileInfo type
     fileInfo, err := os.Stat(certDir)
@@ -257,7 +261,7 @@ func CreateLEAccount(acntFilnam string, dbg bool) (le *LEObj, err error) {
 	if err != nil {
 		return nil, fmt.Errorf("GetCertDir: %v", err)
 	}
-	LEDir = LEdir + "account/"
+//	LEDir = LEDir + "account/"
 
 	// check for existing keys and yaml file
 	if acntFilnam == "" {acntFilnam = "LEAcnt.yaml"}
@@ -706,7 +710,7 @@ func SaveAcmeClient(client *acme.Client, filNam string) (err error) {
 }
 
 // function to retrieve keys for LetsEncrypt acme account
-func GetAcmeClient() (cl *acme.Client, err error) {
+func GetAcmeClient(acntNam string) (cl *acme.Client, err error) {
 
     var client acme.Client
 
@@ -714,10 +718,21 @@ func GetAcmeClient() (cl *acme.Client, err error) {
 	if err != nil {
 		return nil, fmt.Errorf("GetCertDir LEAcnt: %v", err)
 	}
-	LEDir = LEDir + "account/"
+//	LEDir = LEDir + "account/"
+
+	if len(acntNam) == 0 {
+		log.Printf("default account name: LE\n")
+	} else {
+		log.Printf("account name: %s\n", acntNam)
+	}
 
 	privFilNam := LEDir + "LE_priv.key"
 	pubFilNam := LEDir + "LE_pub.key"
+	if acntNam != "" {
+		privFilNam = LEDir + acntNam + "_priv.key"
+		pubFilNam = LEDir + acntNam + "_pub.key"
+	}
+
 
     client.DirectoryURL = "https://acme-staging-v02.api.letsencrypt.org/directory"
 
