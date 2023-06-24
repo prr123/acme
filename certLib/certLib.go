@@ -28,7 +28,7 @@ import (
 )
 
 type LEObj struct {
-	AcntName string `yaml:"AcntName"`
+	AcntNam string `yaml:"AcntName"`
 	AcntId string `yaml:"AcntId"`
 	PrivKeyFilnam string `yaml:"PrivKeyFilnam"`
 	PubKeyFilnam string `yaml:"PubKeyFilnam"`
@@ -44,8 +44,7 @@ type LEObj struct {
 
 
 type CsrList struct {
-    Acnt string `yaml:"account"`
-    AcntName string `yaml:"name"`
+    AcntName string `yaml:"account"`
 	LastLU time.Time `yaml:"last"`
 	OrderUrl string `yaml:"orderUrl"`
 	CertUrl string `yaml:"certUrl"`
@@ -278,7 +277,7 @@ func CreateLEAccount(acntNam string, dbg bool) (le *LEObj, err error) {
     err = yaml.Unmarshal(acntData, &leAcnt)
     if err != nil {return nil, fmt.Errorf("yaml Unmarshal account file: %v\n", err)}
 
-	if len(leAcnt.AcntName) < 1 {return nil, fmt.Errorf("no AcntName provided!\n")}
+	if len(leAcnt.AcntNam) < 1 {return nil, fmt.Errorf("no AcntName provided!\n")}
 
 	remove := leAcnt.Remove
 	useProd := leAcnt.UseProd
@@ -293,8 +292,8 @@ func CreateLEAccount(acntNam string, dbg bool) (le *LEObj, err error) {
 
 	if dbg {PrintLEAcnt(&leAcnt)}
 
-	privFilnam := LEDir + leAcnt.AcntName + "_priv.key"
-	pubFilnam := LEDir + leAcnt.AcntName + "_pub.key"
+	privFilnam := LEDir + leAcnt.AcntNam + "_priv.key"
+	pubFilnam := LEDir + leAcnt.AcntNam + "_pub.key"
 	if dbg {
 		fmt.Printf("privFilnam: %s\n", privFilnam)
 		fmt.Printf("pubFilnam: %s\n", pubFilnam)
@@ -403,7 +402,7 @@ func GetLEClient(acntNam string, dbg bool) (cl *acme.Client, err error) {
 	if err != nil {
 		return nil, fmt.Errorf("GetCertDir: %v", err)
 	}
-	LEDir = LEDir + "account/"
+//	LEDir = LEDir + "account/"
 
 	acntFilnam := LEDir + "LEAcnt.yaml"
 	if len(acntNam) > 0 {
@@ -795,8 +794,7 @@ func CleanCsrFil (csrFilnam string, csrList *CsrList) (err error) {
 func PrintCsrList(csrlist *CsrList) {
 
     fmt.Println("***************** Csr List *****************")
-    fmt.Printf("Account: %s\n", csrlist.Acnt)
-    fmt.Printf("Name:    %s\n", csrlist.AcntName)
+    fmt.Printf("Account: %s\n", csrlist.AcntName)
 	if csrlist.LastLU.IsZero() {
 		fmt.Printf("last mod: NA\n")
 	} else {
@@ -847,7 +845,7 @@ func PrintCsrList(csrlist *CsrList) {
 func PrintLEAcnt(acnt *LEObj) {
 
 	fmt.Printf("*************** LEAcnt *******************\n")
-	fmt.Printf("Acnt Name:  %s\n", acnt.AcntName)
+	fmt.Printf("Acnt Name:  %s\n", acnt.AcntNam)
 	fmt.Printf("AcntId:     %s\n", acnt.AcntId)
 	fmt.Printf("update:     %s\n", acnt.Updated.Format(time.RFC1123))
 	fmt.Printf("Test Url:   %s\n", acnt.ProdUrl)
