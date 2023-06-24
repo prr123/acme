@@ -24,7 +24,7 @@ func main() {
 
 	numarg := len(os.Args)
 	dbg := false
-	acntNam := "LE"
+	acntNam := "LEAcnt"
 
 	log.Printf("debug: %t\n", dbg)
 
