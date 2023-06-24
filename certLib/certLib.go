@@ -250,7 +250,7 @@ func WriteCsrFil(outFilnam string, csrDatList *CsrList) (err error) {
 }
 
 // function that creates a new client
-func CreateLEAccount(acntFilnam string, dbg bool) (le *LEObj, err error) {
+func CreateLEAccount(acntNam string, dbg bool) (le *LEObj, err error) {
 
 //	var LEAcnt LEObj
 
@@ -261,11 +261,14 @@ func CreateLEAccount(acntFilnam string, dbg bool) (le *LEObj, err error) {
 	if err != nil {
 		return nil, fmt.Errorf("GetCertDir: %v", err)
 	}
+//	log.Printf("account name: %s\n", acntNam)
+
 //	LEDir = LEDir + "account/"
 
 	// check for existing keys and yaml file
-	if acntFilnam == "" {acntFilnam = "LEAcnt.yaml"}
-	acntFilnam = LEDir + acntFilnam
+	acntFilnam := LEDir + "LEAcnt.yaml"
+	if acntNam != "" {acntFilnam = LEDir + acntNam + ".yaml"}
+
 	acntData, err := os.ReadFile(acntFilnam)
 	if err != nil {return nil, fmt.Errorf("account ReadFile: %v", err)}
 
@@ -391,7 +394,7 @@ func CreateLEAccount(acntFilnam string, dbg bool) (le *LEObj, err error) {
 }
 
 
-func GetLEClient(acntFilnam string, dbg bool) (cl *acme.Client, err error) {
+func GetLEClient(acntNam string, dbg bool) (cl *acme.Client, err error) {
 
 	client :=acme.Client{}
 
@@ -402,12 +405,13 @@ func GetLEClient(acntFilnam string, dbg bool) (cl *acme.Client, err error) {
 	}
 	LEDir = LEDir + "account/"
 
-	if len(acntFilnam) == 0 {
+	acntFilnam := LEDir + "LEAcnt.yaml"
+	if len(acntNam) > 0 {
+		acntFilnam = LEDir + acntNam + ".yaml"
+		log.Printf("account file: %s\n", acntFilnam)
+	} else {
 		log.Printf("no account file provided using default!")
-		acntFilnam = "LEAcnt.yaml"
 	}
-	acntFilnam = LEDir + acntFilnam
-	log.Printf("account file: %s\n", acntFilnam)
 
 	acntData, err := os.ReadFile(acntFilnam)
 	if err != nil {return nil, fmt.Errorf("account ReadFile: %v", err)}
