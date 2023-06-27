@@ -76,7 +76,7 @@ func main() {
 
 
     certObj, err := certLib.InitCertLib()
-    if err != nil {log.Fatalf("InitCertLib: %v\n", certObj)}
+    if err != nil {log.Fatalf("InitCertLib: %v\n", err)}
     if dbg {certLib.PrintCertObj(certObj)}
 
 
