@@ -186,7 +186,7 @@ func main() {
 			}
 		} else {
 			errStr := err.Error()
-			log.Printf("*** errStr: %s\n", errStr)
+//			log.Printf("*** errStr: %s\n", errStr)
 			idx := strings.Index(errStr, "127.0.0.53:53")
 			if idx>-1 {
 				log.Printf("domain: %s -- no acme challenge record!", acmeDomain)
@@ -204,20 +204,11 @@ func main() {
 		log.Printf("lookup no OldAcme Recs but new Acme Recs found\n")
 	}
 
-    client, err := certLib.GetAcmeClient()
+    client, err := certLib.GetLEClient(csrList.AcntName, dbg)
     if err != nil {log.Fatalf("could not get Acme Client: certLib.GetLEAcnt: %v\n", err)}
 	log.Printf("success obtaining Acme Client\n")
 
-    acnt, err := client.GetReg(ctx, "")
-    if err != nil {log.Fatalf("could not find LE Client Account: getReg: %v\n", err)}
-	if dbg {certLib.PrintAccount(acnt)}
-	log.Printf("success retrieving LE Account\n")
-
-	clientDir, err := client.Discover(ctx)
-	if err != nil {log.Fatalf("could not retrieve LE Directory: Discover: %v\n", err)}
-	log.Printf("success getting client dir\n")
-	if dbg {certLib.PrintDir(clientDir)}
-
+	// lookup needs to be declared before goto statement
 	lookup:= true
 
 	if allChalRec {
@@ -319,7 +310,7 @@ func main() {
 		log.Printf("performing ns.Lookup %s for DNS Challenge Record!\n", acmeDomain)
 
 		rdAttempt := -1
-		for i:= 0; i< 5; i++ {
+		for i:= 0; i< 2; i++ {
 			txtrecs, err := net.LookupTXT(acmeDomain)
 			if err == nil {
 				log.Printf("received txtrec from Lookup\n")
@@ -332,7 +323,7 @@ func main() {
 				log.Printf("*** errStr: %s\n", errStr)
 				idx := strings.Index(errStr, "127.0.0.53:53")
 				if idx>-1 {
-					log.Printf("domain: %s -- no acme challenge record!", acmeDomain)
+					log.Printf("domain: %s -- attempt{%d]: no acme challenge record!", i+1, acmeDomain)
 				} else {
 					log.Fatalf("domain: %s -- lookup: %v", acmeDomain, err)
 				}
