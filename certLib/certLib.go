@@ -588,7 +588,13 @@ func CreateCsrTplNew(csrList *CsrList, domIdx int) (template x509.CertificateReq
 	if numAcmeDom == 0 {return template, fmt.Errorf("no Acme Domains")}
 	if domIdx > numAcmeDom-1 {return template, fmt.Errorf("domIdx > numAcmeDom")}
 
-	nam := (*csrList).Domains[0].Name
+	namIdx :=0
+	if domIdx > -1 { namIdx = domIdx }
+
+	nam := (*csrList).Domains[namIdx].Name
+
+fmt.Printf("nam[%d;%d]:\n%v\n", domIdx,namIdx, nam)
+
 	subj := pkix.Name{
 		CommonName:         nam.CommonName,
 		Country:            []string{nam.Country},
@@ -603,7 +609,6 @@ func CreateCsrTplNew(csrList *CsrList, domIdx int) (template x509.CertificateReq
 	asn1Subj, _ := asn1.Marshal(rawSubj)
 	template = x509.CertificateRequest{
 		RawSubject:         asn1Subj,
-//  	EmailAddresses:     []string{emailAddress}, !not allowed for let's encrypt!!
 		SignatureAlgorithm: x509.ECDSAWithSHA256,
 	}
 
