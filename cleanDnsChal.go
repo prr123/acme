@@ -32,7 +32,7 @@ func main() {
     flags:=[]string{"dbg","csr"}
 
 	useStr := "cleanSnsChal [/csr=csrfile] [/dbg]"
-	helpStr := "help:\nprogram that cleans up the csr file\n"
+	helpStr := "program that expunges Dns challenge records and cleans up the csr file\n"
 
 	csrFilnam := "csrTest.yaml"
 	if numarg > 3 {
@@ -68,10 +68,10 @@ func main() {
     }
 
 	certObj, err := certLib.InitCertLib()
-    if err != nil {log.Fatalf("InitCertLib: %v\n", certObj)}
+    if err != nil {log.Fatalf("InitCertLib: %v\n", err)}
     if dbg {certLib.PrintCertObj(certObj)}
 
-    csrFilnam = certObj.LeDir + "/csrList/" + csrFilnam
+    csrFilnam = certObj.CsrDir + csrFilnam
 	zoneFilnam:= certObj.ZoneDir + "/cfDomainsShort.yaml"
 	cfApiFilnam := certObj.CfApiFilnam
 
@@ -100,7 +100,7 @@ func main() {
 	numAcmeDom := len(csrList.Domains)
     log.Printf("found %d acme Domains\n", numAcmeDom)
 
-	if dbg {certLib.PrintCsr(csrList)}
+	if dbg {certLib.PrintCsrList(csrList)}
 
 	acmeDomList := make([]cfLib.ZoneAcme, numAcmeDom)
 	// see whether acme domains are in zoneList
