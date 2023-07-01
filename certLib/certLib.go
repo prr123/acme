@@ -573,9 +573,7 @@ func CreateCsrTpl(csrData CsrDat) (template x509.CertificateRequest) {
 	asn1Subj, _ := asn1.Marshal(rawSubj)
 	template = x509.CertificateRequest{
 		RawSubject:         asn1Subj,
-//  	EmailAddresses:     []string{emailAddress}, !not allowed for let's encrypt!!
 		SignatureAlgorithm: x509.ECDSAWithSHA256,
-//		DNSNames: []string{},
 		DNSNames: []string{csrData.Domain},
 	}
 	return template
@@ -593,7 +591,7 @@ func CreateCsrTplNew(csrList *CsrList, domIdx int) (template x509.CertificateReq
 
 	nam := (*csrList).Domains[namIdx].Name
 
-fmt.Printf("nam[%d;%d]:\n%v\n", domIdx,namIdx, nam)
+fmt.Printf("dbg -- nam[%d;%d]:\n%s\n", domIdx,namIdx, nam.CommonName)
 
 	subj := pkix.Name{
 		CommonName:         nam.CommonName,
@@ -607,21 +605,23 @@ fmt.Printf("nam[%d;%d]:\n%v\n", domIdx,namIdx, nam)
 	rawSubj := subj.ToRDNSequence()
 
 	asn1Subj, _ := asn1.Marshal(rawSubj)
+
 	template = x509.CertificateRequest{
 		RawSubject:         asn1Subj,
 		SignatureAlgorithm: x509.ECDSAWithSHA256,
 	}
 
+	dnsNam :=[]string{}
+
 	if domIdx < 0 {
-		dnsNam := make([]string, numAcmeDom)
+		dnsNam = make([]string, numAcmeDom)
 		for i:=0; i<numAcmeDom; i++ {
 			dnsNam[i] = (*csrList).Domains[i].Domain
 		}
-		template.DNSNames = dnsNam
-		return template, nil
+	} else {
+		dnsNam = make([]string, 1)
+		dnsNam[0] = (*csrList).Domains[domIdx].Domain
 	}
-	dnsNam := make([]string, 1)
-	dnsNam[0] = csrList.Domains[domIdx].Domain
 	template.DNSNames = dnsNam
 	return template, nil
 }
@@ -1103,6 +1103,7 @@ func PrintCsrReq(req *x509.CertificateRequest) {
 	}
 	fmt.Printf("Version: %d\n", req.Version)
 	fmt.Printf("Subject:\n")
+
 	subj := req.Subject
 	fmt.Printf("  Serial Number: %s\n", subj.SerialNumber)
 	fmt.Printf("  CommonName: %s\n", subj.CommonName)
