@@ -28,7 +28,7 @@ func main() {
 
 	log.Printf("debug: %t\n", dbg)
 
-	useStr := "getAcnt [\acnt=name] [/dbg]"
+	useStr := "checkLEAcnt [/acnt=name] [/dbg]"
 
 //	fmt.Printf("numarg: %d\n", numarg)
 	if numarg > 3 {
@@ -77,10 +77,10 @@ func main() {
     err = yaml.Unmarshal(acntData, &leAcnt)
     if err != nil {log.Fatalf("yaml Unmarshal account file: %v\n", err)}
 
-	if leAcnt.AcntName != acntNam {log.Fatalf("acount names do not match")}
+	if leAcnt.AcntNam != acntNam {log.Fatalf("acount names do not match")}
 //    if len(leAcnt.AcntName) < 1 {return nil, fmt.Errorf("no AcntName provided!\n")}
 
-	if dbg {certLib.PrintLEAcnt(&leAcnt)}
+	certLib.PrintLEAcnt(&leAcnt)
 
 	// creating context
 	ctx := context.Background()
