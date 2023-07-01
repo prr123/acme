@@ -41,19 +41,46 @@ The program, CreateCert, will retrieve the LE Account and generate an Acme clien
 ## programs
 
 ### readCsrList
-program that reads a CsrList yaml file
+program that reads a CsrList yaml file  
 
-usage: ./RdCsrList csrList.yaml
+usage: ./RdCsrList /csr=csrList.yaml  
+
+### checkLEAcnt
+program that reads a yaml account file and checks the validity of the account with the LE CA.  
+
+uasage ./checkLEAcnt /acnt=accountname [/dbg]  
 
 ### checkChal
 program reads csrList File to check whether each domain has a DNS challenge record
 
-### createCerts
-program that creates ssl Certs
 
-usage: ./createCerts csrList.yaml
 
 ### createCerts
+The program createCerts creates x509 certificates. The generated certificates are stored in the directory LEAcnt/certs. The program uses a csr file as input. Csr files are stored in the directory LEAcnt/csrList.  
+Note: if the csr file contains multiple domain names, only a single certificate containing all domain names is being generated.  
+
+usage: ./createCerts /csr=csrList.yaml [/dbg]  
+
+### createMultiCerts
+The program createMultiCerts creates one x509 certificate pair for each domain name listed in the csr file. The generated certificates are stored in the directory LEAcnt/certs. The program uses a csr file as input. Csr files are stored in the directory LEAcnt/csrList.  
+
+usage: ./createCerts /csr=csrList.yaml [/dbg]  
+
+### testDnsChal
+The program testDnsChal performs a dns lookup on each domain in the csr file to see whether the domain name server has a acme challenge record. The program tests each domain listed in the csr file.  
+
+usage: ./testDnsChal /csr=csrList.yaml /dbg  
+
+### cleanDnsChal
+This program removes all Dns challenge records for the domains listed in the csr file and cleans the csr file.  
+
+usage: ./cleanDnsChal /csr=csrList.yaml /dbg  
+
+### fetchCertsFromCa
+
+
+### readPemCerts
+
 
 #### Flow
 
