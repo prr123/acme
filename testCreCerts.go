@@ -84,11 +84,11 @@ func main() {
 	numAcmeDom := len(csrList.Domains)
     log.Printf("found %d acme Domains\n", numAcmeDom)
 
-	if dbg {certLib.PrintCsr(csrList)}
+	if dbg {certLib.PrintCsrList(csrList)}
 //	log.Printf("certDir: %s\n", csrList.CertDir)
 
-	certDir := csrList.CertDir
-	certdir := []byte(csrList.CertDir)
+	certDir := csrList.CertUrl
+	certdir := []byte(csrList.CertUrl)
 	if certdir[len(certdir) - 1] != '/' {certDir += "/"}
 	log.Printf("certDir: %s\n", certDir)
 
