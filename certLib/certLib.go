@@ -402,7 +402,6 @@ func GetLEClient(acntNam string, dbg bool) (cl *acme.Client, err error) {
 	if err != nil {
 		return nil, fmt.Errorf("GetCertDir: %v", err)
 	}
-//	LEDir = LEDir + "account/"
 
 	acntFilnam := LEDir + "LEAcnt.yaml"
 	if len(acntNam) > 0 {
@@ -445,7 +444,13 @@ func GetLEClient(acntNam string, dbg bool) (cl *acme.Client, err error) {
 		return nil, fmt.Errorf("no public key file: %v", err)
 	}
 
-    client.DirectoryURL = "https://acme-staging-v02.api.letsencrypt.org/directory"
+	if leAcnt.UseProd {
+    	client.DirectoryURL = leAcnt.ProdUrl
+	} else {
+    	client.DirectoryURL = leAcnt.TestUrl
+	}
+
+	if dbg {fmt.Printf("Acme Url [prod: %t]: %s\n", leAcnt.UseProd, client.DirectoryURL)}
 
     pemEncoded, err := os.ReadFile(privFilnam)
     if err != nil {return nil, fmt.Errorf("os.Read Priv Key: %v", err)}
