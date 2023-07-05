@@ -49,31 +49,30 @@ func main() {
 		os.Exit(-1)
 	}
 
-	if numarg > 1 {
-		if os.Args[1] == "help" {
-			fmt.Printf("help:\n%s\n", helpStr)
-			fmt.Printf("\nusage is: %s\n", useStr)
-			os.Exit(1)
+	if numarg > 1 && os.Args[1] == "help" {
+		fmt.Printf("help:\n%s\n", helpStr)
+		fmt.Printf("\nusage is: %s\n", useStr)
+		os.Exit(-1)
+	}
+
+	flagMap, err := util.ParseFlags(os.Args, flags)
+	if err != nil {log.Fatalf("util.ParseFlags: %v\n", err)}
+
+	_, ok := flagMap["dbg"]
+	if ok {dbg = true}
+	if dbg {
+		for k, v :=range flagMap {
+			fmt.Printf("flag: /%s value: %s\n", k, v)
 		}
-        flagMap, err := util.ParseFlags(os.Args, flags)
-        if err != nil {log.Fatalf("util.ParseFlags: %v\n", err)}
+	}
 
-        _, ok := flagMap["dbg"]
-        if ok {dbg = true}
-        if dbg {
-            for k, v :=range flagMap {
-                fmt.Printf("k: %s v: %s\n", k, v)
-            }
-        }
-
-        val, ok := flagMap["csr"]
-        if !ok {
-            log.Printf("default csrList: %s\n", csrFilnam)
-        } else {
-            if val.(string) == "none" {log.Fatalf("no yaml file provided with /csr  flag!")}
-            csrFilnam = val.(string)
-            log.Printf("csrList: %s\n", csrFilnam)
-        }
+	val, ok := flagMap["csr"]
+	if !ok {
+		log.Printf("default csrList: %s\n", csrFilnam)
+	} else {
+		if val.(string) == "none" {log.Fatalf("no yaml file provided with /csr  flag!")}
+		csrFilnam = val.(string)
+		log.Printf("csrList: %s\n", csrFilnam)
 	}
 
 	certObj, err := certLib.InitCertLib()
