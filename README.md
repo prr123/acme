@@ -189,14 +189,11 @@ prints an acme order object
 ### PrintChallenge
 prints an acme challenge object
 
-## acmeDnsTest
-programs that tested part of the Dns Challenge
 
 ## Other
 
 ### csrTpl.yaml
 yaml file template for the generation of ssl certificates.
 
-
-dns provider is limited to cloudflare initially.
+Dns providers are limited to cloudflare initially.
 
