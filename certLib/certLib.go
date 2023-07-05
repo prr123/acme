@@ -242,7 +242,7 @@ func WriteCsrFil(outFilnam string, csrDatList *CsrList) (err error) {
 	}
 
 	idx := strings.Index(outFilnam, ".yaml")
-	if idx == -1 {outFilnam += ".yaml")
+	if idx == -1 {outFilnam += ".yaml"}
 
 	outfil, err := os.Create(outFilnam)
 	if err!= nil {return fmt.Errorf("CreateFile: %v\n",err)}
