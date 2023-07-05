@@ -42,7 +42,6 @@ type LEObj struct {
 	ProdUrl string `yaml:"ProdUrl"`
 }
 
-
 type CsrList struct {
     AcntName string `yaml:"account"`
 	LastLU time.Time `yaml:"last"`
@@ -215,10 +214,13 @@ func GenCertKey()(certKey *ecdsa.PrivateKey,err error) {
 
 
 // functions that reads CSRList from a file
-func ReadCsrFil(inFilNam string)(csrDatList *CsrList, err error) {
+func ReadCsrFil(inFilnam string)(csrDatList *CsrList, err error) {
 
     //todo check for yaml extension
-    bytData, err := os.ReadFile(inFilNam)
+	idx := strings.Index(inFilnam,".yaml")
+	if idx == -1 {inFilnam += ".yaml"}
+
+    bytData, err := os.ReadFile(inFilnam)
     if err != nil {
         return nil, fmt.Errorf("os.ReadFile: %v\n",err)
     }
