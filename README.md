@@ -30,21 +30,35 @@ GetLEAcnt retrieves the LE Account. This program can be used to check the existe
 
 The program, CreateCert, will retrieve the LE Account and generate an Acme client.  
 
-### Step 3: Read the a csrList file from LEAcnt and test the domains against the cloudflare domain list.
+### Step 3: Read the csrList file
 
-### Step 4: Generate an authorization order for the domains in the csrList file and obtain challenge tokens.
+Read the a csrList file from LEAcnt and test the domains against the cloudflare domain list.  
 
-### Step 5: Insert the challenge tokens into DNS text records with the name _acme_challenge.domain.  
+### Step 4: Generate the authorization order to obtain challenge tokens
+
+Generate an authorization order for the domains in the csrList file and obtain challenge tokens.  
+
+### Step 5: Create Dns Records with challenge tokens
+
+Insert the challenge tokens into DNS text records with the name _acme_challenge.domain.  
 
 ### Step 6: Test the name servers for the tokens with ns.Lookup.
 
-### Step 7: When the challenge tokens appear, create an order and notify the CA server that the challenges have been accepted. 
+Read the DNS text records to see whether the new DNS records are available for inspection and testing by the CA server.  
 
-### Step 8: Wait for the CA Server to confirm that it has tested the DNS challenge tokens.
+### Step 7: Notify the CA server that the DNS records are ready for inspection
+
+After the challenge tokens appear, create an order and notify the CA server that the challenges have been accepted.  
+
+### Step 8: Wait for a positive test confirmation from the CA Server
+
+Wait for the CA Server to confirm that it has tested the DNS challenge tokens.  
 
 ### Step 9: Create a set of keys for the certificates.
 
-### Step 10: Create a Certificate Request (CSR) template and submit it to the CA server.
+### Step 10: Submit a CSR signing request 
+
+Create a Certificate Request (CSR) template and submit it to the CA server.  
 
 ### Step 11: Obtain the signed certificates in DER encoding.
 
