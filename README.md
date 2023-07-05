@@ -19,9 +19,9 @@ This account contains (for now) the private and public key for the Let's Encrypt
 
 ### Step 1: Create CA Account
 
-#### generate new account with CreLEAcnt
+#### generate new account with createLEAcnt
 
-Program generates a private and public key (LE_private.key and LE_public.key). The key files are stored in the PEM format in the folder LEAcnt.  
+Program generates a private and public key (LE_private.key and LE_public.key). The key files are stored in the PEM format in the folder LEAcnt/account.  
 
 
 ### Step 2: Retrieve the CA Account and generate Acme Client  
@@ -30,32 +30,43 @@ GetLEAcnt retrieves the LE Account. This program can be used to check the existe
 
 The program, CreateCert, will retrieve the LE Account and generate an Acme client.  
 
-### Step 3:  
+### Step 3: Read the a csrList file from LEAcnt and test the domains against the cloudflare domain list.
 
-### Step 4:
+### Step 4: Generate an authorization order for the domains in the csrList file and obtain challenge tokens.
 
-### Step 5:
+### Step 5: Insert the challenge tokens into DNS text records with the name _acme_challenge.domain.  
 
-### Step 6: 
+### Step 6: Test the name servers for the tokens with ns.Lookup.
+
+### Step 7: When the challenge tokens appear, create an order and notify the CA server that the challenges have been accepted. 
+
+### Step 8: Wait for the CA Server to confirm that it has tested the DNS challenge tokens.
+
+### Step 9: Create a set of keys for the certificates.
+
+### Step 10: Create a Certificate Request (CSR) template and submit it to the CA server.
+
+### Step 11: Obtain the signed certificates in DER encoding.
+
+### Step 12: Encode the certificates into PEM form and save in the LEAcnt/certs folder.
 
 ## programs
+### createLEAcnt
+This program cretes an account on the Let's Encrypt CA Server.  
+
+usage: ./createLEAcnt /acnt=account [/dbg]  
+
+### checkLEAcnt
+program that reads a yaml account file and checks the validity of the account with the LE CA server.  
+
+usage: ./checkLEAcnt /acnt=account [/dbg]  
 
 ### readCsrList
 program that reads a CsrList yaml file  
 
 usage: ./RdCsrList /csr=csrList.yaml  
 
-### checkLEAcnt
-program that reads a yaml account file and checks the validity of the account with the LE CA.  
-
-uasage ./checkLEAcnt /acnt=accountname [/dbg]  
-
-### checkChal
-program reads csrList File to check whether each domain has a DNS challenge record
-
-
-
-### createCerts
+### createCertsV3
 The program createCerts creates x509 certificates. The generated certificates are stored in the directory LEAcnt/certs. The program uses a csr file as input. Csr files are stored in the directory LEAcnt/csrList.  
 Note: if the csr file contains multiple domain names, only a single certificate containing all domain names is being generated.  
 
@@ -80,6 +91,8 @@ usage: ./cleanDnsChal /csr=csrList.yaml /dbg
 
 
 ### readPemCerts
+
+This program reads the public key PEM Certficate file, decodes the files and prints the decoded ouput.  
 
 
 #### Flow
